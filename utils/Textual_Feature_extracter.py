@@ -136,7 +136,7 @@ def extract_qualitative_credit_features(input_data, source):
             full_text = input_data["full_text"]
             summary = summarize_whole_text(full_text)
 
-            prompt = COMPANY_PROMPT_TEMPLATE.format(summary=summary)
+            prompt = COMPANY_PROMPT_TEMPLATE.format(summary=combined_summary_text)
 
         elif source == 1:
             # Peer Comparison Mode
@@ -169,3 +169,4 @@ def extract_qualitative_credit_features(input_data, source):
         }
 
     return result
+
