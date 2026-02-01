@@ -1,0 +1,159 @@
+def calculate_size_similarity(company1, company2):
+
+
+    assets1 = company1["metrics"].get("Total assets", 0)
+    assets2 = company2["metrics"].get("Total assets", 0)
+
+
+    if assets1 == 0 or assets2 == 0:
+        return 0
+
+
+    larger = max(assets1, assets2)
+    smaller = min(assets1, assets2)
+    ratio = smaller / larger
+
+
+
+    points = ratio * 40
+
+    return round(points, 2)
+
+#Comaprision of KPIs
+def compare_one_kpi(value1, value2, threshold_small, threshold_medium, threshold_large):
+
+
+
+    difference = abs(value1 - value2)
+
+
+    if difference < threshold_small:
+        return 8.5
+    elif difference < threshold_medium:
+        return 7.5
+    elif difference < threshold_large:
+        return 5.0
+    else:
+        return 2.5
+
+
+def calculate_kpi_similarity(company1, company2):
+
+
+    score = 0
+    kpis1 = company1["kpis"]
+    kpis2 = company2["kpis"]
+
+    #profit margin
+    if "Profit_Margin_%" in kpis1 and "Profit_Margin_%" in kpis2:
+        pm1 = kpis1["Profit_Margin_%"]
+        pm2 = kpis2["Profit_Margin_%"]
+
+        score += compare_one_kpi(pm1, pm2, 2, 5, 10)
+
+    #ROA
+    if "ROA_%" in kpis1 and "ROA_%" in kpis2:
+        roa1 = kpis1["ROA_%"]
+        roa2 = kpis2["ROA_%"]
+
+        score += compare_one_kpi(roa1, roa2, 2, 5, 10)
+
+    #debt ratio
+    if "Debt_Ratio_%" in kpis1 and "Debt_Ratio_%" in kpis2:
+        debt1 = kpis1["Debt_Ratio_%"]
+        debt2 = kpis2["Debt_Ratio_%"]
+
+        score += compare_one_kpi(debt1, debt2, 5, 10, 20)
+
+
+
+    return round(score, 2)
+def calculate_total_similarity(company1, company2):
+
+
+    size_score = calculate_size_similarity(company1, company2)
+    kpi_score = calculate_kpi_similarity(company1, company2)
+    total = size_score + kpi_score
+
+    return {
+        "total": round(total, 2),
+        "size_score": size_score,
+        "kpi_score": kpi_score
+    }
+
+#firstby same industry then similar KPIs
+def find_peers(new_company, all_companies, top_n=5):
+
+
+    new_industry = new_company["industry"]
+
+    same_industry = [
+        c for c in all_companies
+        if c["industry"] == new_industry
+        and c["company_name"] != new_company["company_name"]
+    ]
+
+    print(f"\n Total companies inn '{new_industry}' industry: {len(same_industry)}")
+
+    if len(same_industry) == 0:
+        print("No peers in the industry ")
+        return []
+
+    # Calculate similarity for each peer
+    peers = []
+    for company in same_industry:
+        similarity = calculate_total_similarity(new_company, company)
+
+        peers.append({
+            "company_name": company["company_name"],
+            "industry": company["industry"],
+            "total_similarity": similarity["total"],
+            "size_similarity": similarity["size_score"],
+            "kpi_similarity": similarity["kpi_score"],
+            "total_assets": company["metrics"].get("Total assets", 0),
+            "profit_margin": company["kpis"].get("Profit_Margin_%", "N/A"),
+            "roa": company["kpis"].get("ROA_%", "N/A"),
+            "debt_ratio": company["kpis"].get("Debt_Ratio_%", "N/A")
+        })
+
+
+    peers.sort(key=lambda x: x["total_similarity"], reverse=True)
+
+    return peers[:top_n]
+# using first company as sample
+sample_company = complete_companies[0]
+
+print(f"\n NEW COMPANY: {sample_company['company_name']}")
+print(f"   Industry: {sample_company['industry']}")
+print(f"   Total Assets: ${sample_company['metrics']['Total assets']:,.0f}")
+print(f"   Profit Margin: {sample_company['kpis'].get('Profit_Margin_%', 'N/A')}%")
+print(f"   ROA: {sample_company['kpis'].get('ROA_%', 'N/A')}%")
+print(f"   Debt Ratio: {sample_company['kpis'].get('Debt_Ratio_%', 'N/A')}%")
+
+# Find peers
+peers = find_peers(sample_company, complete_companies, top_n=5)
+
+if peers:
+
+
+    for i, peer in enumerate(peers, 1):
+        print(f"\n{i}. {peer['company_name']}")
+        print(f"   Total Similarity: {peer['total_similarity']}/100")
+        print(f"     - Size Similarity: {peer['size_similarity']}/30")
+        print(f"     - KPI Similarity: {peer['kpi_similarity']}/70")
+        print(f"   Total Assets: ${peer['total_assets']:,.0f}")
+        print(f"   Profit Margin: {peer['profit_margin']}%")
+        print(f"   ROA: {peer['roa']}%")
+        print(f"   Debt Ratio: {peer['debt_ratio']}%")
+
+
+peer_analysis = {
+    "new_company": {
+        "name": sample_company["company_name"],
+        "industry": sample_company["industry"],
+        "metrics": sample_company["metrics"],
+        "kpis": sample_company["kpis"]
+    },
+    "peers": peers
+}
+
