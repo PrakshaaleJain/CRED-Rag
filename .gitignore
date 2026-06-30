@@ -1,3 +1,8 @@
 .env
 .venv
 py_cache/
+
+sec_filings_md/
+sec_filings/
+
+__pycache__/
