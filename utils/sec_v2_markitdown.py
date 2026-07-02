@@ -33,8 +33,8 @@ HEADERS = {
 # -------------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------------
-SAVE_HTML_FOLDER = "sec_filings"
-SAVE_MD_FOLDER = "sec_filings_md"
+SAVE_HTML_FOLDER = os.getenv("sec_filings_html")
+SAVE_MD_FOLDER = os.getenv("sec_filings_md")
 
 os.makedirs(SAVE_HTML_FOLDER, exist_ok=True)
 os.makedirs(SAVE_MD_FOLDER, exist_ok=True)
@@ -184,7 +184,7 @@ print(f"Successfully saved : {len(saved_files)} filings")
 
 if failed_companies:
     print(f"Failed             : {len(failed_companies)} companies")
-    for ticker, company in failed_companies:
-        print(f"  - {ticker}: {company}")
+    # for ticker, company in failed_companies:
+    #     print(f"  - {ticker}: {company}")
 else:
     print("No failures.")
