@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HTML_DIR = Path(os.getenv("sec_filings_html"))
-OUTPUT_DIR = Path(os.getenv("KPI_tables"))
+OUTPUT_DIR = Path(os.getenv("_tables"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 ############################################################
