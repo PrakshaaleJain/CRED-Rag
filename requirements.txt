@@ -4,3 +4,5 @@ matplotlib
 langchain_experimental
 langchain_core
 "markitdown[all]"
+beautifulsoup4
+lxml
