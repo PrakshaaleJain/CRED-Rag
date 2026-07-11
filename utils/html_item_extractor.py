@@ -87,23 +87,90 @@ def extract_items(html_path, items):
             start_elem = find_start_elem(soup, None, key)
 
         if not start_elem:
-            results[item] = ''
+            results[item] = {
+                "item": item,
+                "title": f"Item {item}",
+                "text": clean_text(text)
+            }
             continue
 
         text = extract_until_next(start_elem, anchor_ids, anchor)
-        # If extracted text is empty, also include the heading text itself
+
         if not text:
-            # include the start element text
             text = start_elem.get_text(separator=' ', strip=True)
-        results[item] = text
+
+        results[item] = {
+            "title": f"Item {item}",
+            "text": clean_text(text)
+        }
 
     return results
+
+def extract_until_next(start_elem, anchor_ids_set, current_anchor_id):
+    texts = []
+    seen = set()
+
+    for node in start_elem.next_elements:
+
+        # Stop at next SEC Item
+        if getattr(node, "get", None):
+            node_id = node.get("id")
+            if node_id and node_id in anchor_ids_set and node_id != current_anchor_id:
+                break
+
+        # Only process block elements
+        if getattr(node, "name", None) not in {
+            "p", "div", "li",
+            "h1", "h2", "h3", "h4", "h5", "h6"
+        }:
+            continue
+
+        # Avoid processing the same tag twice
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+
+        text = node.get_text(" ", strip=True)
+
+        if not text:
+            continue
+
+        # Stop if we accidentally reached the next Item heading
+        if re.match(r"^Item\s+\d+[A-Z]?\.", text, re.I):
+            break
+
+        texts.append(text)
+
+    return "\n\n".join(texts)
+
+def clean_text(text):
+    # Remove page metadata
+    text = re.sub(r'Field:.*', '', text)
+    # Remove isolated page numbers
+    text = re.sub(r'^\d+\s*$', '', text, flags=re.MULTILINE)
+
+    # Remove Page/Sequence markers
+    text = re.sub(r'^/?Page\s*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^/?Sequence\s*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^PageNo\s*$', '', text, flags=re.MULTILINE)
+
+    # Join wrapped lines
+    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+
+    # Collapse spaces
+    text = re.sub(r'[ \t]+', ' ', text)
+
+    # Collapse multiple blank lines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--html', required=True)
     p.add_argument('--items', required=False, default='1,1A,3,7,10,11', help='Comma-separated list of items')
     p.add_argument('--out', required=False, default='extracted_items.json')
+    # p.add_argument('--out', required=False, default='extracted_items.txt')
     args = p.parse_args()
 
     items = [x.strip() for x in args.items.split(',') if x.strip()]
@@ -112,6 +179,14 @@ def main():
     out_path = Path(args.out)
     out_path.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding='utf-8')
     print(f'Wrote {len(res)} items to {out_path}')
+
+    # combined_text = ""
+    # for section, content in res.items():
+    #     combined_text += f"\n\n--- BEGIN {section.upper()} ---\n\n"
+    #     combined_text += content
+
+    # out_path.write_text(combined_text, encoding="utf-8")
+    # print(f'Wrote {len(res)} items to {out_path}')
 
 if __name__ == '__main__':
     main()
