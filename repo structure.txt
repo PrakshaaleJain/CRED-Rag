@@ -1,0 +1,96 @@
+financial-raptor/
+│
+├── README.md
+├── requirements.txt
+├── pyproject.toml
+├── .gitignore
+├── LICENSE
+│
+├── configs/
+│   ├── default.yaml
+│   ├── fingpt.yaml
+│   ├── finbert.yaml
+│   └── query_config.yaml
+│
+├── data/
+│   ├── raw/
+│   │   ├── AAPL_2023.json
+│   │   ├── MSFT_2023.json
+│   │   └── ...
+│   │
+│   ├── processed/
+│   │   └── combined_text/
+│   │
+│   └── trees/
+│       ├── AAPL/
+│       ├── MSFT/
+│       └── ...
+│
+├── notebooks/
+│   ├── exploration.ipynb
+│   └── tree_visualization.ipynb
+│
+├── src/
+│   │
+│   ├── main.py
+│   │
+│   ├── preprocessing/
+│   │   ├── __init__.py
+│   │   ├── json_loader.py
+│   │   ├── section_parser.py
+│   │   ├── text_formatter.py
+│   │   └── chunk_cleaner.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── fingpt_summarizer.py
+│   │   ├── finbert_embedding.py
+│   │   ├── base_embedding.py
+│   │   └── base_summarizer.py
+│   │
+│   ├── raptor_pipeline/
+│   │   ├── __init__.py
+│   │   ├── build_tree.py
+│   │   ├── save_tree.py
+│   │   ├── load_tree.py
+│   │   ├── retrieval.py
+│   │   └── query.py
+│   │
+│   ├── prompts/
+│   │   ├── summarization.py
+│   │   ├── query_prompts.py
+│   │   └── scoring_prompts.py
+│   │
+│   ├── evaluation/
+│   │   ├── metrics.py
+│   │   ├── benchmark.py
+│   │   └── compare_models.py
+│   │
+│   ├── utils/
+│   │   ├── logger.py
+│   │   ├── io.py
+│   │   ├── helpers.py
+│   │   └── constants.py
+│   │
+│   └── cli/
+│       ├── build_tree.py
+│       ├── query_tree.py
+│       └── evaluate.py
+│
+├── scripts/
+│   ├── download_models.py
+│   ├── build_all_trees.py
+│   ├── query_company.py
+│   └── batch_query.py
+│
+├── tests/
+│   ├── test_preprocessing.py
+│   ├── test_summarizer.py
+│   ├── test_embeddings.py
+│   ├── test_tree.py
+│   └── test_query.py
+│
+└── outputs/
+    ├── summaries/
+    ├── query_results/
+    └── logs/

@@ -6,3 +6,10 @@ langchain_core
 "markitdown[all]"
 beautifulsoup4
 lxml
+torch
+transformers
+accelerate
+scikit-learn
+scipy
+sentencepiece
+protobuf
