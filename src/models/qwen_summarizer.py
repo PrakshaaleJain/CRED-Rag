@@ -1,7 +1,7 @@
 import os
 from typing import Optional
-import requests
-from transformers import AutoTokenizer
+import torch
+from transformers import AutoTokenizer, pipeline
 
 from .base_summarizer import BaseSummarizationModel
 
@@ -16,32 +16,33 @@ SUMMARIZATION_SYSTEM_PROMPT = (
 
 
 class QwenSummarizationModel(BaseSummarizationModel):
-    """RAPTOR-compatible summarizer backed by Qwen2.5-7B-Instruct API."""
+    """RAPTOR-compatible summarizer backed by a local Qwen model on GPU."""
 
     def __init__(
         self,
         model_name: str = DEFAULT_SUMMARIZER_MODEL,
-        api_key: Optional[str] = None,
-        api_url: Optional[str] = None,
         device: Optional[str] = None,
-        torch_dtype: Optional[any] = None,
         load_in_4bit: bool = False,
+        **kwargs
     ) -> None:
         self.model_name = os.getenv("QWEN_MODEL_NAME", model_name)
-        self.api_key = api_key or os.getenv("HF_TOKEN") or os.getenv("HF_API_KEY") or os.getenv("QWEN_API_KEY") or os.getenv("OPENAI_API_KEY")
         
-        # Determine the API URL (defaults to HuggingFace Serverless Inference OpenAI-compatible endpoint)
-        raw_url = api_url or os.getenv("QWEN_API_URL") or os.getenv("HF_API_URL") or os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL") or "https://api-inference.huggingface.co/v1"
-        self.api_url = raw_url.rstrip("/")
-
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         
-        # Load local tokenizer for token calculations (lightweight, runs on CPU)
-        # Use try-except to handle cases where downloading the exact model tokenizer fails
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        except Exception:
-            # Fallback to a standard generic tokenizer if name is not found/offline
-            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        model_kwargs = {"torch_dtype": torch.float16}
+        if load_in_4bit:
+            model_kwargs["load_in_4bit"] = True
+            
+        device_id = 0 if torch.cuda.is_available() else -1
+        
+        print(f"Loading {self.model_name} locally on {'GPU' if device_id == 0 else 'CPU'}...")
+        self.pipe = pipeline(
+            "text-generation",
+            model=self.model_name,
+            tokenizer=self.tokenizer,
+            model_kwargs=model_kwargs,
+            device=device_id
+        )
 
     def summarize(self, context: str, max_tokens: int = 256) -> str:
         messages = [
@@ -55,29 +56,18 @@ class QwenSummarizationModel(BaseSummarizationModel):
             },
         ]
 
-        # Call OpenAI-compatible chat completion endpoint
-        url = f"{self.api_url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        prompt = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
 
-        payload = {
-            "model": self.model_name,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": 0.2,
-        }
-
-        try:
-            response = requests.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            res_json = response.json()
-            return res_json["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            # If the API call fails, raise a helpful error
-            raise RuntimeError(f"Qwen API summarization failed: {e}")
+        outputs = self.pipe(
+            prompt,
+            max_new_tokens=max_tokens,
+            temperature=0.2,
+            do_sample=True,
+            return_full_text=False
+        )
+        return outputs[0]["generated_text"].strip()
 
     def generate(self, prompt: str, max_tokens: int = 150, system_prompt: Optional[str] = None) -> str:
         messages = []
@@ -85,26 +75,16 @@ class QwenSummarizationModel(BaseSummarizationModel):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        url = f"{self.api_url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        formatted_prompt = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
 
-        payload = {
-            "model": self.model_name,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": 0.2,
-        }
-
-        try:
-            response = requests.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            res_json = response.json()
-            return res_json["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            raise RuntimeError(f"Qwen API generation failed: {e}")
-
+        outputs = self.pipe(
+            formatted_prompt,
+            max_new_tokens=max_tokens,
+            temperature=0.2,
+            do_sample=True,
+            return_full_text=False
+        )
+        return outputs[0]["generated_text"].strip()
 
