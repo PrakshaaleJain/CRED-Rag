@@ -13,3 +13,4 @@ scipy
 sentencepiece
 protobuf
 sentence-transformers
+openpyxl
