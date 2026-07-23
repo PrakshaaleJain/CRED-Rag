@@ -5,18 +5,19 @@ from transformers import AutoTokenizer, pipeline
 
 from .base_summarizer import BaseSummarizationModel
 
-DEFAULT_SUMMARIZER_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+DEFAULT_SUMMARIZER_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
 SUMMARIZATION_SYSTEM_PROMPT = (
     "You are a financial analyst summarizing SEC 10-K filing excerpts for "
     "corporate credit risk assessment. Produce concise, factual summaries that "
     "preserve key business details, risks, management information, and financial "
-    "context. Do not invent facts."
+    "context. Retain all exact percentages, currency figures, dates, and "
+    "covenant thresholds verbatim from the source text. Do not invent facts."
 )
 
 
-class QwenSummarizationModel(BaseSummarizationModel):
-    """RAPTOR-compatible summarizer backed by a local Qwen model on GPU."""
+class LlamaSummarizationModel(BaseSummarizationModel):
+    """RAPTOR-compatible summarizer backed by a local Llama-3.1 model on GPU."""
 
     def __init__(
         self,
@@ -25,16 +26,16 @@ class QwenSummarizationModel(BaseSummarizationModel):
         load_in_4bit: bool = False,
         **kwargs
     ) -> None:
-        self.model_name = os.getenv("QWEN_MODEL_NAME", model_name)
-        
+        self.model_name = os.getenv("LLAMA_MODEL_NAME", model_name)
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        
+
         model_kwargs = {"torch_dtype": torch.float16}
         if load_in_4bit:
             model_kwargs["load_in_4bit"] = True
-            
+
         device_id = 0 if torch.cuda.is_available() else -1
-        
+
         print(f"Loading {self.model_name} locally on {'GPU' if device_id == 0 else 'CPU'}...")
         self.pipe = pipeline(
             "text-generation",
@@ -87,4 +88,3 @@ class QwenSummarizationModel(BaseSummarizationModel):
             return_full_text=False
         )
         return outputs[0]["generated_text"].strip()
-

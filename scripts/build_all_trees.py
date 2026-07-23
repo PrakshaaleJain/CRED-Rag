@@ -49,13 +49,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--summarizer-model",
         type=str,
-        default="Qwen/Qwen2.5-7B-Instruct",
+        default="meta-llama/Llama-3.1-8B-Instruct",
         help="HuggingFace model id for summarization",
     )
     parser.add_argument(
         "--embedding-model",
         type=str,
-        default="BAAI/bge-base-en-v1.5",
+        default="yixuantt/Fin-E5",
         help="HuggingFace model id for embeddings",
     )
     return parser.parse_args()

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Set
 from src.models.base_embedding import BaseEmbeddingModel
 from src.models.base_summarizer import BaseSummarizationModel
 from src.models.hf_embedding import HFEmbeddingModel
-from src.models.qwen_summarizer import QwenSummarizationModel
+from src.models.llama_summarizer import LlamaSummarizationModel
 
 from .cluster_utils import RAPTORClustering
 from .tree_structures import Node, Tree
@@ -24,9 +24,9 @@ class TreeBuilderConfig:
     reduction_dimension: int = 10
     cluster_threshold: float = 0.1
     max_length_in_cluster: int = 3500
-    summarization_model: BaseSummarizationModel = field(default_factory=QwenSummarizationModel)
+    summarization_model: BaseSummarizationModel = field(default_factory=LlamaSummarizationModel)
     embedding_model: BaseEmbeddingModel = field(default_factory=HFEmbeddingModel)
-    cluster_embedding_model: str = "BGE"
+    cluster_embedding_model: str = "FinE5"
     tokenizer = None
 
     def __post_init__(self) -> None:

@@ -7,7 +7,7 @@ from typing import Dict, Optional, Union
 from src.models.base_embedding import BaseEmbeddingModel
 from src.models.base_summarizer import BaseSummarizationModel
 from src.models.hf_embedding import HFEmbeddingModel
-from src.models.qwen_summarizer import QwenSummarizationModel
+from src.models.llama_summarizer import LlamaSummarizationModel
 from src.preprocessing.json_loader import (
     discover_extracted_json_files,
     load_concatenated_text,
@@ -31,11 +31,11 @@ class RaptorPipelineConfig:
     cluster_threshold: float = 0.1
     summarization_model: Optional[BaseSummarizationModel] = None
     embedding_model: Optional[BaseEmbeddingModel] = None
-    embedding_model_name: str = "BAAI/bge-base-en-v1.5"
-    summarizer_model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    embedding_model_name: str = "yixuantt/Fin-E5"
+    summarizer_model_name: str = "meta-llama/Llama-3.1-8B-Instruct"
 
     def to_tree_builder_config(self) -> TreeBuilderConfig:
-        summarization_model = self.summarization_model or QwenSummarizationModel(
+        summarization_model = self.summarization_model or LlamaSummarizationModel(
             model_name=self.summarizer_model_name
         )
         embedding_model = self.embedding_model or HFEmbeddingModel(

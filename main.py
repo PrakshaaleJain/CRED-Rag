@@ -23,14 +23,11 @@ def load_env_file(filepath: str = ".env") -> None:
 def main() -> None:
     load_env_file()
 
-    # Verify if APIs are configured
+    # Verify if HuggingFace token is configured (needed for gated models like LLaMA)
     hf_token = os.getenv("HF_TOKEN") or os.getenv("HF_API_KEY")
-    qwen_key = os.getenv("QWEN_API_KEY")
-    bge_key = os.getenv("BGE_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
 
-    if not any([hf_token, qwen_key, bge_key, openai_key]) or hf_token == "your_huggingface_token_here":
-        print("[WARNING] No API keys (HF_TOKEN, QWEN_API_KEY, BGE_API_KEY, or OPENAI_API_KEY) are configured in .env. API calls may fail.")
+    if not hf_token or hf_token == "your_huggingface_token_here":
+        print("[WARNING] No HF_TOKEN configured in .env. Gated model downloads (e.g., LLaMA) may fail.")
 
 
     # Configure paths
