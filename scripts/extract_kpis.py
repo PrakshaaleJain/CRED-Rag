@@ -16,10 +16,10 @@ TARGET_ITEMS = {
     'Retained Earnings': r'^(Retained\s+Earnings|Accumulated\s+Deficit|Retained\s+Earnings\s+\(Accumulated\s+Deficit\))$',
     'Net Income': r'^(Net\s+Income\s+\(Loss\)|Net\s+Income|Net\s+Loss|Net\s+income\s+\(loss\)\s+attributable\s+to.*)$',
     'Total Revenue': r'^(Total\s+Revenues|Revenues|Total\s+Revenue|Total\s+net\s+revenues|Revenue|Sales|Net\s+Sales)$',
-    'EBIT': r'^(Operating\s+Income\s+\(Loss\)|Operating\s+Income|Operating\s+Loss|Income\s+\(loss\)\s+from\s+operations)$',
-    'Interest Expense': r'^(Interest\s+Expense|Interest\s+expense,\s+net|Interest\s+expense)$',
+    'EBIT': r'^(Operating\s+Income\s+\(Loss\)|Operating\s+Income|Operating\s+Loss|Income\s+/\s+\(loss\)\s+from\s+operations|Income\s+\(loss\)\s+from\s+operations|Loss\s+from\s+operations|Income\s+from\s+operations)$',
+    'Interest Expense': r'^(Interest\s+expenses?|Interest\s+expenses?\s+net|Interest\s+expenses?,\s+net)$',
     'Operating Cash Flow': r'^(Net\s+cash\s+provided\s+by\s+\(used\s+in\)\s+operating\s+activities|Net\s+cash\s+provided\s+by\s+operating\s+activities|Net\s+Cash\s+used\s+in\s+Operating\s+Activities)$',
-    'Cash & Short-Term Investments': r'^(Cash\s+and\s+cash\s+equivalents|Cash\s+and\s+short-term\s+investments|Cash,\s+cash\s+equivalents\s+and\s+short-term\s+investments|Cash,\s+end\s+of\s+period|Cash)$'
+    'Cash & Short-Term Investments': r'^(Cash\s+and\s+cash\s+equivalents|Cash\s+and\s+short-term\s+investments|Cash\s+cash\s+equivalents\s+and\s+short-term\s+investments|Cash\s+end\s+of\s+period|Cash)$'
 }
 
 def clean_number(val):
