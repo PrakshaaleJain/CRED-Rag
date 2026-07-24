@@ -1,11 +1,11 @@
 import os
+import requests
 from typing import Optional
-import torch
-from transformers import AutoTokenizer, pipeline
 
 from .base_summarizer import BaseSummarizationModel
 
 DEFAULT_SUMMARIZER_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+VLLM_API_URL = "http://localhost:8000/v1/chat/completions"
 
 SUMMARIZATION_SYSTEM_PROMPT = (
     "You are a financial analyst summarizing SEC 10-K filing excerpts for "
@@ -17,33 +17,16 @@ SUMMARIZATION_SYSTEM_PROMPT = (
 
 
 class LlamaSummarizationModel(BaseSummarizationModel):
-    """RAPTOR-compatible summarizer backed by a local Llama-3.1 model on GPU."""
+    """RAPTOR-compatible summarizer backed by a local vLLM server."""
 
     def __init__(
         self,
         model_name: str = DEFAULT_SUMMARIZER_MODEL,
-        device: Optional[str] = None,
-        load_in_4bit: bool = False,
         **kwargs
     ) -> None:
         self.model_name = os.getenv("LLAMA_MODEL_NAME", model_name)
-
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-
-        model_kwargs = {"torch_dtype": torch.float16}
-        if load_in_4bit:
-            model_kwargs["load_in_4bit"] = True
-
-        device_id = 0 if torch.cuda.is_available() else -1
-
-        print(f"Loading {self.model_name} locally on {'GPU' if device_id == 0 else 'CPU'}...")
-        self.pipe = pipeline(
-            "text-generation",
-            model=self.model_name,
-            tokenizer=self.tokenizer,
-            model_kwargs=model_kwargs,
-            device=device_id
-        )
+        self.api_url = os.getenv("VLLM_API_URL", VLLM_API_URL)
+        print(f"Connecting to vLLM server at {self.api_url} for model {self.model_name}...")
 
     def summarize(self, context: str, max_tokens: int = 256) -> str:
         messages = [
@@ -56,19 +39,23 @@ class LlamaSummarizationModel(BaseSummarizationModel):
                 ),
             },
         ]
+        
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.2,
+        }
 
-        prompt = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-
-        outputs = self.pipe(
-            prompt,
-            max_new_tokens=max_tokens,
-            temperature=0.2,
-            do_sample=True,
-            return_full_text=False
-        )
-        return outputs[0]["generated_text"].strip()
+        try:
+            response = requests.post(self.api_url, json=payload, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[Error] vLLM API connection failed: {e}")
+            print(f"Ensure your vLLM server is running at {self.api_url}")
+            return ""
 
     def generate(self, prompt: str, max_tokens: int = 150, system_prompt: Optional[str] = None) -> str:
         messages = []
@@ -76,15 +63,18 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        formatted_prompt = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.2,
+        }
 
-        outputs = self.pipe(
-            formatted_prompt,
-            max_new_tokens=max_tokens,
-            temperature=0.2,
-            do_sample=True,
-            return_full_text=False
-        )
-        return outputs[0]["generated_text"].strip()
+        try:
+            response = requests.post(self.api_url, json=payload, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[Error] vLLM API connection failed: {e}")
+            return ""
