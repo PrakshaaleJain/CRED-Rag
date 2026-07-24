@@ -200,14 +200,17 @@ def process_excel_file(filepath):
 
 if __name__ == "__main__":
     kpi_dir = "data/KPI_tables"
+    quant_dir = "data/quant_kpi"
+    os.makedirs(quant_dir, exist_ok=True)
+    
     for filename in os.listdir(kpi_dir):
         if filename.endswith(".xlsx"):
             filepath = os.path.join(kpi_dir, filename)
             result = process_excel_file(filepath)
             
-            output_name = filename.replace('.xlsx', '_KPIs.json')
-            output_path = os.path.join(kpi_dir, output_name)
-            with open(output_path, 'w') as f:
-                json.dump(result, f, indent=4)
-            print(f"Saved KPIs to {output_path}")
-
+            if result is not None:
+                output_name = filename.replace('.xlsx', '_KPIs.json')
+                output_path = os.path.join(quant_dir, output_name)
+                with open(output_path, 'w') as f:
+                    json.dump(result, f, indent=4)
+                print(f"Saved KPIs to {output_path}")
