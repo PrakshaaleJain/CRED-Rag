@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-HTML_DIR = Path(os.getenv("sec_filings_html"))
-OUTPUT_DIR = Path(os.getenv("_tables"))
+HTML_DIR = Path(os.getenv("sec_filings_html", "./data/sec_filings_html"))
+OUTPUT_DIR = Path(os.getenv("sec_tables_db", "./data/sec_tables"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 ############################################################
