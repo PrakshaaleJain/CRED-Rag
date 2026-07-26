@@ -87,13 +87,26 @@ class RaptorSummarizer:
             logger.warning("No *_extracted.json files found in %s", directory)
             return trees
 
-        for json_path in json_files:
-            logger.info("Building RAPTOR tree for %s", json_path.name)
-            tree = self.build_tree_from_json(json_path)
-            trees[json_path.stem] = tree
-
+        total_files = len(json_files)
+        for idx, json_path in enumerate(json_files, start=1):
+            logger.info("Building RAPTOR tree for %s (%d/%d)", json_path.name, idx, total_files)
+            
             if output_dir is not None:
-                save_tree(tree, Path(output_dir) / json_path.stem)
+                expected_tree_file = Path(output_dir) / json_path.stem / "tree.pkl"
+                if expected_tree_file.exists():
+                    logger.info("Tree already exists at %s. Skipping.", expected_tree_file)
+                    continue
+
+            try:
+                tree = self.build_tree_from_json(json_path)
+
+                if output_dir is not None:
+                    save_tree(tree, Path(output_dir) / json_path.stem)
+                else:
+                    # Only store in memory if we are NOT saving to disk to prevent OOM
+                    trees[json_path.stem] = tree
+            except Exception as e:
+                logger.error("Failed to build tree for %s: %s", json_path.name, str(e))
 
         return trees
 
