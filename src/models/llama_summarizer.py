@@ -1,6 +1,7 @@
 import os
 import requests
 from typing import Optional
+from transformers import AutoTokenizer
 
 from .base_summarizer import BaseSummarizationModel
 
@@ -27,6 +28,9 @@ class LlamaSummarizationModel(BaseSummarizationModel):
         self.model_name = os.getenv("LLAMA_MODEL_NAME", model_name)
         self.api_url = os.getenv("VLLM_API_URL", VLLM_API_URL)
         print(f"Connecting to vLLM server at {self.api_url} for model {self.model_name}...")
+        
+        # Load a public ungated Llama-3 tokenizer for accurate token counting during chunking
+        self.tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
 
     def summarize(self, context: str, max_tokens: int = 256) -> str:
         messages = [
