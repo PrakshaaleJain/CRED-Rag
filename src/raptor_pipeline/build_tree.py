@@ -31,7 +31,7 @@ class RaptorPipelineConfig:
     cluster_threshold: float = 0.1
     summarization_model: Optional[BaseSummarizationModel] = None
     embedding_model: Optional[BaseEmbeddingModel] = None
-    embedding_model_name: str = "yixuantt/Fin-E5"
+    embedding_model_name: str = "BAAI/bge-base-en-v1.5"
     summarizer_model_name: str = "meta-llama/Llama-3.1-8B-Instruct"
 
     def to_tree_builder_config(self) -> TreeBuilderConfig:

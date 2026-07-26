@@ -11,7 +11,7 @@ class HFEmbeddingModel(BaseEmbeddingModel):
 
     def __init__(
         self,
-        model_name: str = "yixuantt/Fin-E5",
+        model_name: str = "BAAI/bge-base-en-v1.5",
         max_length: int = 512,
         **kwargs
     ) -> None:

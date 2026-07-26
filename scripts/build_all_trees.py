@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--embedding-model",
         type=str,
-        default="yixuantt/Fin-E5",
+        default="BAAI/bge-base-en-v1.5",
         help="HuggingFace model id for embeddings",
     )
     return parser.parse_args()
