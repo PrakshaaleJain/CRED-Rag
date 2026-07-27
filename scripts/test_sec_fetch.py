@@ -41,20 +41,20 @@ def main():
     xml_files = glob.glob('data/Egan/*.xml')
     print(f"Found {len(xml_files)} XML files.")
     
-    count = 0
-    # Let's test until we successfully process 3 public companies
-    for f in xml_files:
+    matched_count = 0
+    unmatched_count = 0
+    
+    for i, f in enumerate(xml_files):
+        if i % 500 == 0 and i > 0:
+            print(f"Processed {i}/{len(xml_files)} files...")
+
         ticker, name, years = parse_egan_xml(f)
-        if not ticker or ticker == 'ENT_01' or ticker == 'NRSRO': 
+        if not ticker or ticker in ['ENT_01', 'NRSRO']: 
+            unmatched_count += 1
             continue
             
         if ticker.upper() in ticker_to_cik:
-            count += 1
-            print(f"File: {os.path.basename(f)}")
-            print(f"Company: {name}, Ticker: {ticker.upper()}, Rating Years: {years}")
-            
             cik = ticker_to_cik[ticker.upper()]
-            print(f"Matched to SEC CIK: {cik}")
             
             # Fetch submissions
             sub_res = requests.get(f"https://data.sec.gov/submissions/CIK{cik}.json", headers=headers)
@@ -64,26 +64,31 @@ def main():
                 forms = filings.get('form', [])
                 dates = filings.get('filingDate', [])
                 
-                # check for 10-K in the years
-                found_10ks = []
-                for i, form in enumerate(forms):
-                    if form == '10-K':
-                        found_10ks.append(dates[i])
-                        
-                print(f"Found 10-K filings on dates: {found_10ks[:5]} ... (showing first 5)")
+                # Extract 10-K filing dates
+                found_10ks = [dates[idx] for idx, form in enumerate(forms) if form == '10-K']
                 
-                # Verify if we have 10-Ks matching the rating years
-                filing_years = set(d.split('-')[0] for d in found_10ks)
+                # Get the latest 2 years of 10-K filings
+                latest_2_10ks = found_10ks[:2]
+                
+                filing_years = set(d.split('-')[0] for d in latest_2_10ks)
                 rating_years = set(years)
                 overlap = rating_years.intersection(filing_years)
-                print(f"Overlap between Rating Years and 10-K Filing Years: {sorted(list(overlap))}")
+                
+                if overlap:
+                    matched_count += 1
+                    # print(f"Matched: {name} (Ticker: {ticker.upper()}) | Latest 10-Ks: {latest_2_10ks} | Overlap: {sorted(list(overlap))}")
+                else:
+                    unmatched_count += 1
             else:
-                print(f"Failed to fetch SEC submissions for CIK {cik}")
-            print("-" * 60)
-            time.sleep(0.5) # rate limit
+                unmatched_count += 1
+            time.sleep(0.12) # Respect SEC rate limits (max 10 req/sec)
+        else:
+            unmatched_count += 1
             
-        if count >= 3:
-            break
+    print("-" * 60)
+    print(f"Execution Completed.")
+    print(f"Total Matched (with recent 10-K overlap): {matched_count}")
+    print(f"Total Unmatched/Skipped: {unmatched_count}")
 
 if __name__ == '__main__':
     main()
