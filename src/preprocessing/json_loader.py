@@ -9,14 +9,26 @@ def load_extracted_json(path: Union[str, Path]) -> Dict[str, Any]:
         return json.load(file)
 
 
+import re
+
+def clean_text_for_raptor(text: str) -> str:
+    """Clean the text by removing unnecessary newlines, extra spaces, and symbols."""
+    if not text:
+        return ""
+    # Replace multiple whitespace characters (including \n\n, \n, \t) with a single space
+    text = re.sub(r'\s+', ' ', text)
+    # Remove special unicode replacement characters or unwanted symbols if any
+    text = text.replace('\ufffd', '')
+    return text.strip()
+
 def _extract_section_text(section_value: Any) -> str:
     if isinstance(section_value, str):
-        return section_value.strip()
+        return clean_text_for_raptor(section_value)
 
     if isinstance(section_value, dict):
         text = section_value.get("text")
         if isinstance(text, str):
-            return text.strip()
+            return clean_text_for_raptor(text)
 
     return ""
 
