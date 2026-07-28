@@ -32,8 +32,6 @@ def build_toc_map(soup):
                 if m:
                     mapping[m.group(1).upper()] = href
     # fallback: try to parse any link text like 'Item 1.' in siblings
-
-    print(mapping)
     return mapping
 
 def find_start_elem(soup, anchor_id, item_label=None):
