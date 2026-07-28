@@ -53,7 +53,7 @@ def get_cik_for_xml(filepath, ticker_to_cik, name_to_cik, name_keys):
         if norm_name in name_to_cik:
             cik = name_to_cik[norm_name]
         elif norm_name:
-            matches = difflib.get_close_matches(norm_name, name_keys, n=1, cutoff=0.85)
+            matches = difflib.get_close_matches(norm_name, name_keys, n=1, cutoff=0.95)
             if matches:
                 cik = name_to_cik[matches[0]]
                 
