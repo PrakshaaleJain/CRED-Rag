@@ -23,13 +23,13 @@ def main():
     parser.add_argument(
         "--input-dir", 
         type=Path, 
-        default=project_root / "data" / "sec_filings_html",
+        default=project_root / "data" / "egan_sec_filings_html",
         help="Directory containing the HTML filings"
     )
     parser.add_argument(
         "--output-dir", 
         type=Path, 
-        default=project_root / "data" / "sec_extracted_text", 
+        default=project_root / "data" / "egan_sec_filings_extracted_text", 
         help="Directory to save the JSONs"
     )
     parser.add_argument(
