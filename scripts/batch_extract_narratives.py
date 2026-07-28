@@ -54,11 +54,6 @@ def main():
     for idx, html_path in enumerate(html_files, start=1):
         out_path = args.output_dir / f"{html_path.stem}_extracted.json"
         
-        # Checkpoint: skip if already extracted
-        if out_path.exists():
-            logging.info(f"[{idx}/{total}] Already extracted {html_path.name}. Skipping.")
-            continue
-            
         logging.info(f"[{idx}/{total}] Extracting {html_path.name}...")
         try:
             res = extract_items(str(html_path), items_list)
