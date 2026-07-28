@@ -70,6 +70,9 @@ def extract_until_next(start_elem, anchor_ids_set, current_anchor_id):
 
 def extract_items(html_path, items):
     html = Path(html_path).read_text(encoding='utf-8', errors='ignore')
+    import warnings
+    from bs4 import XMLParsedAsHTMLWarning
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
     soup = BeautifulSoup(html, 'lxml')
 
     toc_map = build_toc_map(soup)
@@ -90,7 +93,7 @@ def extract_items(html_path, items):
             results[item] = {
                 "item": item,
                 "title": f"Item {item}",
-                "text": clean_text(text)
+                "text": ""
             }
             continue
 
