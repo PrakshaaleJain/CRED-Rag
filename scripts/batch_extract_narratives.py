@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Batch process HTML SEC filings into JSON extracted narratives."""
+"""Batch process HTML SEC filings into JSON extracted narratives using multiprocessing."""
 
 import argparse
 import json
 import logging
 import sys
+import multiprocessing
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Ensure we can import from utils
 project_root = Path(__file__).resolve().parents[1]
@@ -17,6 +19,17 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+def process_file(html_path, output_dir, items_list):
+    """Worker function to process a single file."""
+    out_path = output_dir / f"{html_path.stem}_extracted.json"
+    
+    try:
+        res = extract_items(str(html_path), items_list)
+        out_path.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding='utf-8')
+        return html_path.name, True, None
+    except Exception as e:
+        return html_path.name, False, str(e)
 
 def main():
     parser = argparse.ArgumentParser(description="Batch extract narrative items from SEC HTML filings.")
@@ -35,8 +48,14 @@ def main():
     parser.add_argument(
         "--items", 
         type=str, 
-        default="1,1A,3,7,7A,9,15", 
+        default="1,1A,3,7,10,11", 
         help="Comma-separated items to extract"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help="Number of parallel worker processes to use (defaults to all CPU cores)"
     )
     args = parser.parse_args()
 
@@ -50,18 +69,28 @@ def main():
 
     items_list = [x.strip() for x in args.items.split(',') if x.strip()]
     total = len(html_files)
+    
+    logging.info(f"Starting extraction of {total} files using {args.workers} parallel workers...")
 
-    for idx, html_path in enumerate(html_files, start=1):
-        out_path = args.output_dir / f"{html_path.stem}_extracted.json"
+    success_count = 0
+    with ProcessPoolExecutor(max_workers=args.workers) as executor:
+        # Submit all tasks to the process pool
+        futures = {
+            executor.submit(process_file, html_path, args.output_dir, items_list): html_path 
+            for html_path in html_files
+        }
         
-        logging.info(f"[{idx}/{total}] Extracting {html_path.name}...")
-        try:
-            res = extract_items(str(html_path), items_list)
-            out_path.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding='utf-8')
-        except Exception as e:
-            logging.error(f"Failed to extract {html_path.name}: {e}")
+        # Log progress as soon as each file finishes extracting
+        for i, future in enumerate(as_completed(futures), start=1):
+            filename, success, error_msg = future.result()
+            
+            if success:
+                success_count += 1
+                logging.info(f"[{i}/{total}] Successfully extracted {filename}")
+            else:
+                logging.error(f"[{i}/{total}] Failed to extract {filename}: {error_msg}")
 
-    logging.info("Batch extraction complete!")
+    logging.info(f"Batch extraction complete! Successfully processed {success_count}/{total} files.")
 
 if __name__ == "__main__":
     main()
