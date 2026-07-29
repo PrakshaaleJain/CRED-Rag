@@ -10,8 +10,6 @@ from sklearn.mixture import GaussianMixture
 from .tree_structures import Node
 from .utils import get_embeddings
 
-warnings.filterwarnings("ignore", category=ConvergenceWarning)
-
 logger = logging.getLogger(__name__)
 
 RANDOM_SEED = 42
@@ -41,7 +39,9 @@ def _get_optimal_clusters(embeddings: np.ndarray, max_clusters: int = 50) -> int
             n_components=cluster_count,
             random_state=RANDOM_SEED,
         )
-        model.fit(embeddings)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=ConvergenceWarning)
+            model.fit(embeddings)
         bics.append(model.bic(embeddings))
 
     return int(cluster_range[int(np.argmin(bics))])
@@ -53,7 +53,9 @@ def _gmm_cluster(
 ) -> tuple[list[np.ndarray], int]:
     cluster_count = _get_optimal_clusters(embeddings)
     model = GaussianMixture(n_components=cluster_count, random_state=RANDOM_SEED)
-    model.fit(embeddings)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ConvergenceWarning)
+        model.fit(embeddings)
     probabilities = model.predict_proba(embeddings)
     labels = [np.where(probability > threshold)[0] for probability in probabilities]
     return labels, cluster_count
