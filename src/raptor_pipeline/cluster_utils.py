@@ -1,12 +1,16 @@
 import logging
+import warnings
 from typing import List, Optional
 
 import numpy as np
 from sklearn.decomposition import PCA
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.mixture import GaussianMixture
 
 from .tree_structures import Node
 from .utils import get_embeddings
+
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 logger = logging.getLogger(__name__)
 
