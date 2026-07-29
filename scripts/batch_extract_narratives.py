@@ -35,7 +35,7 @@ def main():
     parser.add_argument(
         "--items", 
         type=str, 
-        default="1,1A,3,7,10,11", 
+        default="1,1A,3,7,7A,9,15", 
         help="Comma-separated items to extract"
     )
     args = parser.parse_args()
