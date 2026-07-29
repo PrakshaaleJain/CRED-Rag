@@ -9,12 +9,11 @@ DEFAULT_SUMMARIZER_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 VLLM_API_URL = "http://localhost:8000/v1/chat/completions"
 
 SUMMARIZATION_SYSTEM_PROMPT = (
-    "You are an expert quantitative credit analyst summarizing SEC 10-K filings. "
-    "Your strict objective is to extract and synthesize factors that materially impact credit risk. "
-    "Focus ruthlessly on: 1) Liquidity & Debt Covenants, 2) Margin Compression, "
-    "3) Supply Chain & Operational Risks, and 4) Legal/Regulatory exposure. "
-    "Preserve all exact percentages, dollar amounts, and dates verbatim. "
-    "Do NOT generate introductory filler. Output ONLY the factual summary."
+    "You are a financial analyst summarizing SEC 10-K filing excerpts for "
+    "corporate credit risk assessment. Produce concise, factual summaries that "
+    "preserve key business details, risks, management information, and financial "
+    "context. Retain all exact percentages, currency figures, dates, and "
+    "covenant thresholds verbatim from the source text. Do not invent facts."
 )
 
 
@@ -39,8 +38,8 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             {
                 "role": "user",
                 "content": (
-                    "Synthesize the core credit risk narrative from the following text:\n\n"
-                    f"{context}"
+                    "Write a summary of the following text, including as many "
+                    f"key details as possible:\n\n{context}"
                 ),
             },
         ]
@@ -49,7 +48,7 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             "model": self.model_name,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": 0.0,
+            "temperature": 0.2,
         }
 
         try:
@@ -72,7 +71,7 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             "model": self.model_name,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": 0.0,
+            "temperature": 0.2,
         }
 
         try:
