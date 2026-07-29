@@ -10,8 +10,8 @@ from src.raptor_pipeline import RaptorPipelineConfig, RaptorSummarizer
 
 def parse_args() -> argparse.Namespace:
     project_root = Path(__file__).resolve().parents[1]
-    default_input = project_root / "data" / "sec_extracted_text"
-    default_output = project_root / "data" / "trees"
+    default_input = project_root / "data" / "egan_sec_filings_extracted_text"
+    default_output = project_root / "data" / "egan_sec_filings_trees"
 
     parser = argparse.ArgumentParser(
         description="Build RAPTOR summary trees from extracted SEC JSON files."
