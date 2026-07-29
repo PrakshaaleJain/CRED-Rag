@@ -11,7 +11,7 @@ from pathlib import Path
 # Minimum total character count to consider an extraction "valid"
 # A real 10-K MD&A (Item 7) and Risk Factors (Item 1A) will easily exceed 10,000 characters.
 # Setting a conservative threshold of 2,000 characters to filter out just the headers.
-MIN_CHARS_THRESHOLD = 2000
+MIN_CHARS_THRESHOLD = 1200
 
 logging.basicConfig(
     level=logging.INFO,
