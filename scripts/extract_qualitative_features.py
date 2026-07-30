@@ -29,7 +29,7 @@ TOPICS = {
     "Free Cash Flow": "Free Cash Flow: What is the commentary regarding cash generation, capital expenditures, debt repayment, and liquidity?"
 }
 
-LLM_API_URL = "http://localhost:8000/v1/chat/completions"
+LLM_API_URL = "http://localhost:8001/v1/chat/completions"
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 def construct_prompt(context: str) -> str:
@@ -69,7 +69,8 @@ def main():
         
     # Check if the LLM server is up
     try:
-        res = requests.get("http://localhost:8000/v1/models", timeout=3)
+        base_url = LLM_API_URL.replace("/chat/completions", "/models")
+        res = requests.get(base_url, timeout=3)
         res.raise_for_status()
         model_id = res.json()["data"][0]["id"]
         logging.info(f"Connected to LLM Server. Using model: {model_id}")
