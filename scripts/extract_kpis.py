@@ -187,7 +187,11 @@ def main():
     success_count = 0
     failed_count = 0
     
-    for filepath in all_files:
+    total_files = len(all_files)
+    for idx, filepath in enumerate(all_files, 1):
+        if idx % 20 == 0 or idx == 1:
+            print(f"[{idx}/{total_files}] Processing {filepath.name}...")
+            
         try:
             results, errors = process_file(filepath)
             if errors:
