@@ -157,7 +157,8 @@ def main():
         }
         
         try:
-            resp = requests.post(LLM_API_URL, json=payload, timeout=120)
+            # Increased timeout to 600 seconds to prevent Read timed out on dense documents
+            resp = requests.post(LLM_API_URL, json=payload, timeout=600)
             resp.raise_for_status()
             llm_output = resp.json()["choices"][0]["message"]["content"]
             
