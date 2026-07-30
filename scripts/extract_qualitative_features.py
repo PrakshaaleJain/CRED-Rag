@@ -6,6 +6,7 @@ import logging
 import requests
 from pathlib import Path
 import sys
+import itertools
 
 # Ensure we can import from src
 project_root = Path(__file__).resolve().parents[1]
@@ -41,11 +42,11 @@ def construct_prompt(context: str) -> str:
 For speed and brevity, you MUST limit your response to EXACTLY ONE SHORT SENTENCE per topic. Be extremely concise.
 
 Respond STRICTLY with a JSON object using these exact keys:
-1. "Revenue": What is driving sales growth or contraction? (ONE sentence)
-2. "Operating Profit": What factors are impacting operational efficiency? (ONE sentence)
-3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins? (ONE sentence)
-4. "Net Profit": What is management's narrative around bottom-line earnings? (ONE sentence)
-5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity? (ONE sentence)
+1. "Revenue": What is driving sales growth or contraction? (TWO sentence)
+2. "Operating Profit": What factors are impacting operational efficiency? (TWO sentence)
+3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins? (TWO sentence)
+4. "Net Profit": What is management's narrative around bottom-line earnings? (TWO sentence)
+5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity? (TWO sentence)
 
 Context:
 {context}
