@@ -11,6 +11,7 @@ def identify_sheets(filepath):
     
     bs_sheet = None
     is_sheet = None
+    cf_sheet = None
     
     for sheet in sheet_names:
         sheet_lower = sheet.lower()
@@ -26,8 +27,14 @@ def identify_sheets(filepath):
             if "parenthetical" not in sheet_lower and "comprehensive" not in sheet_lower and "detail" not in sheet_lower:
                 if not is_sheet:
                     is_sheet = sheet
+                    
+        # Cash Flow Statement matcher
+        if any(kw in sheet_lower for kw in ["cash flows", "statement of cash flows", "cash flows from operating activities"]):
+            if "parenthetical" not in sheet_lower and "detail" not in sheet_lower:
+                if not cf_sheet:
+                    cf_sheet = sheet
                 
-    return bs_sheet, is_sheet
+    return bs_sheet, is_sheet, cf_sheet
 
 def extract_value(df, keywords, col_idx):
     if df is None or df.empty or col_idx >= len(df.columns):
@@ -52,7 +59,7 @@ def extract_value(df, keywords, col_idx):
     return None
 
 def extract_debt(df, col_idx):
-    lt_debt = extract_value(df, ["long-term debt"], col_idx)
+    lt_debt = extract_value(df, ["long-term debt", "total debt", "debt", "notes payable"], col_idx)
     st_debt = extract_value(df, ["short-term debt", "current portion of long-term debt"], col_idx)
     
     if lt_debt is None and st_debt is None:
@@ -79,7 +86,7 @@ def process_file(filepath):
     except:
         filing_year = 0
         
-    bs_sheet, is_sheet = identify_sheets(filepath)
+    bs_sheet, is_sheet, cf_sheet = identify_sheets(filepath)
     
     missing_critical = []
     if not bs_sheet: missing_critical.append("Balance Sheet")
@@ -91,6 +98,9 @@ def process_file(filepath):
     try:
         df_bs = pd.read_excel(filepath, sheet_name=bs_sheet).dropna(how='all', axis=1)
         df_is = pd.read_excel(filepath, sheet_name=is_sheet).dropna(how='all', axis=1)
+        df_cf = None
+        if cf_sheet:
+            df_cf = pd.read_excel(filepath, sheet_name=cf_sheet).dropna(how='all', axis=1)
     except Exception as e:
         return None, [f"Excel Read Error: {str(e)}"]
         
@@ -114,21 +124,23 @@ def process_file(filepath):
         
         total_debt = extract_debt(df_bs, col_idx)
         
-        total_revenue = extract_value(df_is, ["total revenues", "total revenues and other income", "sales and other operating revenues"], col_idx)
+        total_revenue = extract_value(df_is, ["total revenues", "total revenues and other income", "sales and other operating revenues", "revenues", "net sales", "sales", "product sales"], col_idx)
         net_income = extract_value(df_is, ["net income", "net income (loss)", "net income attributable to"], col_idx)
-        interest_exp = extract_value(df_is, ["interest expense", "interest and debt expense"], col_idx)
-        da = extract_value(df_is, ["depreciation and amortization"], col_idx)
+        interest_exp = extract_value(df_is, ["interest expense", "interest and debt expense", "interest and other", "interest income (expense)", "interest expense, net"], col_idx)
+        
+        da = None
+        if df_cf is not None:
+            da = extract_value(df_cf, ["depreciation and amortization", "depreciation", "amortization"], col_idx)
+        if da is None:
+            da = extract_value(df_is, ["depreciation and amortization", "depreciation", "amortization"], col_idx)
+            
         taxes = extract_value(df_is, ["income tax expense", "provision for income taxes", "income taxes"], col_idx)
         
         if total_assets is None and net_income is None:
             continue
             
         ebit = safe_add(net_income, taxes, interest_exp)
-        ebitda = safe_add(ebit, da)
-        ffo = safe_add(net_income, da)
         
-        interest_coverage = safe_div(ebitda, interest_exp)
-        dscr = safe_div(ffo, total_debt)
         debt_to_equity = safe_div(total_debt, total_equity)
         re_to_ta = safe_div(retained_earnings, total_assets)
         current_ratio = safe_div(current_assets, current_liab)
@@ -149,8 +161,6 @@ def process_file(filepath):
             "File_Name": basename,
             "CIK_Identifier": cik,
             "Fiscal_Year": year_val,
-            "Interest Coverage Ratio": interest_coverage,
-            "DSCR": dscr,
             "Debt-to-Equity": debt_to_equity,
             "Retained Earnings / Total Assets": re_to_ta,
             "Current Ratio": current_ratio,
