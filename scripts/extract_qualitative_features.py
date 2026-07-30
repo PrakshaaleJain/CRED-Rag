@@ -154,7 +154,8 @@ def main():
             "model": model_id,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.1
+            "temperature": 0.1,
+            "max_tokens": 4096
         }
         
         try:
