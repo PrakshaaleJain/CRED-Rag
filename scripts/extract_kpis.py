@@ -17,13 +17,15 @@ def identify_sheets(filepath):
         
         # Balance Sheet matcher
         if any(kw in sheet_lower for kw in ["balance sheet", "consolidated balance", "financial position"]):
-            if "parenthetical" not in sheet_lower:
-                bs_sheet = sheet
+            if "parenthetical" not in sheet_lower and "detail" not in sheet_lower:
+                if not bs_sheet:
+                    bs_sheet = sheet
                 
         # Income Statement matcher
         if any(kw in sheet_lower for kw in ["statement of operations", "statements of oper", "statement of oper", "statement of income", "statement of earnings"]):
-            if "parenthetical" not in sheet_lower and "comprehensive" not in sheet_lower:
-                is_sheet = sheet
+            if "parenthetical" not in sheet_lower and "comprehensive" not in sheet_lower and "detail" not in sheet_lower:
+                if not is_sheet:
+                    is_sheet = sheet
                 
     return bs_sheet, is_sheet
 
