@@ -130,7 +130,9 @@ def main():
             logging.warning(f"No valid embeddings found in tree for {cik}_{year}.")
             continue
             
-        corpus_tensor = torch.tensor(node_embs)
+        # Ensure corpus_tensor is on the same device as the query embeddings (e.g., cuda:0)
+        device = list(topic_embeddings.values())[0].device
+        corpus_tensor = torch.tensor(node_embs, device=device)
         selected_nodes = set()
         
         # Pull top 4 nodes per topic
