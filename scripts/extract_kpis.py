@@ -1,216 +1,233 @@
 import os
-import json
-import re
-import math
+import glob
 import pandas as pd
-import numpy as np
+import json
+import logging
+from pathlib import Path
 
-# Define mappings from standard names to regex patterns
-# The patterns handle common variations in SEC filings
-TARGET_ITEMS = {
-    'Total Assets': r'^(Total\s+Assets|Assets)$',
-    'Current Assets': r'^(Total\s+Current\s+Assets|Current\s+Assets)$',
-    'Total Liabilities': r'^(Total\s+Liabilities|Liabilities)$',
-    'Current Liabilities': r'^(Total\s+Current\s+Liabilities|Current\s+Liabilities)$',
-    'Total Equity': r'^(Total\s+Stockholders(\'|\’|)\s+Equity|Total\s+Shareholders(\'|\’|)\s+(Equity|Deficit)|Stockholders(\'|\’|)\s+Equity|Total\s+Liabilities\s+and\s+Stockholders(\'|\’|)\s+Equity\s+\-\s+Total\s+Liabilities)$',
-    'Retained Earnings': r'^(Retained\s+Earnings|Accumulated\s+Deficit|Retained\s+Earnings\s+\(Accumulated\s+Deficit\))$',
-    'Net Income': r'^(Net\s+Income\s+\(Loss\)|Net\s+Income|Net\s+Loss|Net\s+income\s+\(loss\)\s+attributable\s+to.*)$',
-    'Total Revenue': r'^(Total\s+Revenues|Revenues|Total\s+Revenue|Total\s+net\s+revenues|Revenue|Sales|Net\s+Sales)$',
-    'EBIT': r'^(Operating\s+Income\s+\(Loss\)|Operating\s+Income|Operating\s+Loss|Income\s+/\s+\(loss\)\s+from\s+operations|Income\s+\(loss\)\s+from\s+operations|Loss\s+from\s+operations|Income\s+from\s+operations)$',
-    'Interest Expense': r'^(Interest\s+expenses?|Interest\s+expenses?\s+net|Interest\s+expenses?,\s+net)$',
-    'Operating Cash Flow': r'^(Net\s+cash\s+provided\s+by\s+\(used\s+in\)\s+operating\s+activities|Net\s+cash\s+provided\s+by\s+operating\s+activities|Net\s+Cash\s+used\s+in\s+Operating\s+Activities)$',
-    'Cash & Short-Term Investments': r'^(Cash\s+and\s+cash\s+equivalents|Cash\s+and\s+short-term\s+investments|Cash\s+cash\s+equivalents\s+and\s+short-term\s+investments|Cash\s+end\s+of\s+period|Cash)$'
-}
+def identify_sheets(filepath):
+    xl = pd.ExcelFile(filepath)
+    sheet_names = xl.sheet_names
+    
+    bs_sheet = None
+    is_sheet = None
+    
+    for sheet in sheet_names:
+        sheet_lower = sheet.lower()
+        
+        # Balance Sheet matcher
+        if any(kw in sheet_lower for kw in ["balance sheet", "consolidated balance", "financial position"]):
+            if "parenthetical" not in sheet_lower:
+                bs_sheet = sheet
+                
+        # Income Statement matcher
+        if any(kw in sheet_lower for kw in ["statement of operations", "statement of income", "statement of opera", "statement of earnings"]):
+            if "parenthetical" not in sheet_lower and "comprehensive" not in sheet_lower:
+                is_sheet = sheet
+                
+    return bs_sheet, is_sheet
 
-def clean_number(val):
-    if pd.isna(val):
+def extract_value(df, keywords, col_idx):
+    if df is None or df.empty or col_idx >= len(df.columns):
         return None
+        
+    for idx, row in df.iterrows():
+        label = str(row.iloc[0]).lower().strip()
+        for kw in keywords:
+            if kw.lower() in label:
+                val = row.iloc[col_idx]
+                if pd.isna(val) or str(val).strip() in ['-', '', 'None', 'nan']:
+                    continue
+                
+                val_str = str(val).strip().replace('$', '').replace(',', '')
+                if val_str.startswith('(') and val_str.endswith(')'):
+                    val_str = '-' + val_str[1:-1]
+                
+                try:
+                    return float(val_str)
+                except ValueError:
+                    pass
+    return None
+
+def extract_debt(df, col_idx):
+    lt_debt = extract_value(df, ["long-term debt"], col_idx)
+    st_debt = extract_value(df, ["short-term debt", "current portion of long-term debt"], col_idx)
     
-    if isinstance(val, (int, float)):
-        return float(val)
-        
-    s = str(val).strip()
-    # Check for empty or non-numeric placeholder
-    if s in ['—', '-', '', ')']:
-        return 0.0
-        
-    # Handle parentheses for negative numbers
-    is_negative = False
-    if '(' in s or ')' in s:
-        is_negative = True
-        s = s.replace('(', '').replace(')', '')
-        
-    # Remove commas and $ signs
-    s = s.replace(',', '').replace('$', '').strip()
+    if lt_debt is None and st_debt is None:
+        return None
+    return (lt_debt or 0.0) + (st_debt or 0.0)
+
+def safe_div(num, den):
+    if num is None or den is None or den == 0:
+        return None
+    return round(num / den, 4)
+
+def safe_add(*args):
+    if any(a is None for a in args):
+        return None
+    return sum(args)
+
+def process_file(filepath):
+    basename = os.path.basename(filepath)
+    parts = basename.replace('.xlsx', '').split('_')
     
+    cik = parts[0]
     try:
-        num = float(s)
-        return -num if is_negative else num
-    except ValueError:
-        return None
-
-def process_excel_file(filepath):
-    print(f"Processing {filepath}...")
-    df = pd.read_excel(filepath, sheet_name=0, header=None)
+        filing_year = int(parts[1])
+    except:
+        filing_year = 0
+        
+    bs_sheet, is_sheet = identify_sheets(filepath)
     
-    extracted_data = {
-        'Raw_Items': {},
-        'KPIs': {}
-    }
+    missing_critical = []
+    if not bs_sheet: missing_critical.append("Balance Sheet")
+    if not is_sheet: missing_critical.append("Income Statement")
     
-    # Initialize all raw items to None
-    for item in TARGET_ITEMS.keys():
-        extracted_data['Raw_Items'][item + '_t'] = None
-        if item == 'Total Assets':
-            extracted_data['Raw_Items'][item + '_t-1'] = None
+    if missing_critical:
+        return None, missing_critical
+        
+    try:
+        df_bs = pd.read_excel(filepath, sheet_name=bs_sheet).dropna(how='all', axis=1)
+        df_is = pd.read_excel(filepath, sheet_name=is_sheet).dropna(how='all', axis=1)
+    except Exception as e:
+        return None, [f"Excel Read Error: {str(e)}"]
+        
+    max_cols = min(4, len(df_bs.columns), len(df_is.columns))
+    results = []
+    
+    for col_idx in range(1, max_cols):
+        year_val = filing_year - (col_idx - 1)
+        
+        total_assets = extract_value(df_bs, ["total assets"], col_idx)
+        total_equity = extract_value(df_bs, ["total equity", "total stockholders' equity", "stockholders' equity"], col_idx)
+        
+        total_liab = extract_value(df_bs, ["total liabilities"], col_idx)
+        if total_liab is None and total_assets is not None and total_equity is not None:
+            total_liab = total_assets - total_equity
             
-    # Iterate over rows
-    for index, row in df.iterrows():
-        first_col_val = str(row[0]).strip() if not pd.isna(row[0]) else ""
-        if not first_col_val:
-            # Maybe the label is in the second column
-            first_col_val = str(row[1]).strip() if len(row) > 1 and not pd.isna(row[1]) else ""
-            
-        if not first_col_val:
+        current_assets = extract_value(df_bs, ["total current assets"], col_idx)
+        current_liab = extract_value(df_bs, ["total current liabilities"], col_idx)
+        inventory = extract_value(df_bs, ["inventories", "inventory"], col_idx)
+        retained_earnings = extract_value(df_bs, ["retained earnings", "accumulated deficit"], col_idx)
+        
+        total_debt = extract_debt(df_bs, col_idx)
+        
+        total_revenue = extract_value(df_is, ["total revenues", "total revenues and other income", "sales and other operating revenues"], col_idx)
+        net_income = extract_value(df_is, ["net income", "net income (loss)", "net income attributable to"], col_idx)
+        interest_exp = extract_value(df_is, ["interest expense", "interest and debt expense"], col_idx)
+        da = extract_value(df_is, ["depreciation and amortization"], col_idx)
+        taxes = extract_value(df_is, ["income tax expense", "provision for income taxes", "income taxes"], col_idx)
+        
+        if total_assets is None and net_income is None:
             continue
             
-        # Clean up label for matching
-        label = re.sub(r'[^a-zA-Z0-9\s\(\)\-]', '', first_col_val).strip()
+        ebit = safe_add(net_income, taxes, interest_exp)
+        ebitda = safe_add(ebit, da)
+        ffo = safe_add(net_income, da)
         
-        for item_name, pattern in TARGET_ITEMS.items():
-            if re.match(pattern, label, re.IGNORECASE):
-                # We found a match, extract numbers from the remaining columns
-                numbers = []
-                for col_idx in range(1, len(row)):
-                    val = clean_number(row[col_idx])
-                    if val is not None:
-                        numbers.append(val)
-                
-                if numbers:
-                    # Prefer the first match if already found (to avoid lower down notes replacing actual line items)
-                    if extracted_data['Raw_Items'].get(item_name + '_t') is None:
-                        extracted_data['Raw_Items'][item_name + '_t'] = numbers[0]
-                        if item_name == 'Total Assets' and len(numbers) > 1:
-                            extracted_data['Raw_Items'][item_name + '_t-1'] = numbers[1]
-                break
-
-    # Some fallback logic
-    raw = extracted_data['Raw_Items']
-    
-    # Calculate KPIs
-    # Safe division helper
-    def safe_div(num, den):
-        if num is None or den is None or den == 0:
-            return None
-        return num / den
-
-    kpi = extracted_data['KPIs']
-    
-    # X1
-    kpi['X1_Altman_Current_Assets_to_Total'] = safe_div(
-        (raw['Current Assets_t'] or 0) - (raw['Current Liabilities_t'] or 0), 
-        raw['Total Assets_t']
-    )
-    
-    # X2
-    kpi['X2_Altman_Retained_Earnings_to_Total'] = safe_div(
-        raw['Retained Earnings_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X3
-    kpi['X3_Altman_EBIT_to_Total'] = safe_div(
-        raw['EBIT_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X4
-    kpi['X4_Altman_Equity_to_Liabilities'] = safe_div(
-        raw['Total Equity_t'], 
-        raw['Total Liabilities_t']
-    )
-    
-    # X5
-    kpi['X5_Altman_Revenue_to_Total'] = safe_div(
-        raw['Total Revenue_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X6
-    kpi['X6_Ohlson_Liabilities_to_Total'] = safe_div(
-        raw['Total Liabilities_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X7
-    kpi['X7_Ohlson_Net_Income_to_Total'] = safe_div(
-        raw['Net Income_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X8
-    kpi['X8_Ohlson_Current_Assets_to_Current_Liabilities'] = safe_div(
-        raw['Current Assets_t'], 
-        raw['Current Liabilities_t']
-    )
-    
-    # X9
-    if raw['Total Assets_t'] and raw['Total Assets_t'] > 0:
-        kpi['X9_Ohlson_Log_Total_Assets'] = math.log(raw['Total Assets_t'])
-    else:
-        kpi['X9_Ohlson_Log_Total_Assets'] = None
+        interest_coverage = safe_div(ebitda, interest_exp)
+        dscr = safe_div(ffo, total_debt)
+        debt_to_equity = safe_div(total_debt, total_equity)
+        re_to_ta = safe_div(retained_earnings, total_assets)
+        current_ratio = safe_div(current_assets, current_liab)
         
-    # X10
-    kpi['X10_Zmijewski_Operating_Cash_Flow_to_Liabilities'] = safe_div(
-        raw['Operating Cash Flow_t'], 
-        raw['Total Liabilities_t']
-    )
-    
-    # X11
-    kpi['X11_Zmijewski_Cash_to_Total_Assets'] = safe_div(
-        raw['Cash & Short-Term Investments_t'], 
-        raw['Total Assets_t']
-    )
-    
-    # X12
-    kpi['X12_Zmijewski_EBIT_to_Interest_Expense'] = safe_div(
-        raw['EBIT_t'], 
-        raw['Interest Expense_t']
-    )
-    
-    # X13
-    kpi['X13_Growth_Net_Income_to_Equity'] = safe_div(
-        raw['Net Income_t'], 
-        raw['Total Equity_t']
-    )
-    
-    # X14
-    kpi['X14_Growth_Liabilities_to_Equity'] = safe_div(
-        raw['Total Liabilities_t'], 
-        raw['Total Equity_t']
-    )
-    
-    # X15
-    kpi['X15_Growth_Assets_Growth'] = safe_div(
-        (raw['Total Assets_t'] or 0) - (raw['Total Assets_t-1'] or 0),
-        raw['Total Assets_t-1']
-    )
-    
-    return extracted_data
-
-if __name__ == "__main__":
-    kpi_dir = "data/KPI_tables"
-    quant_dir = "data/quant_kpi"
-    os.makedirs(quant_dir, exist_ok=True)
-    
-    for filename in os.listdir(kpi_dir):
-        if filename.endswith(".xlsx"):
-            filepath = os.path.join(kpi_dir, filename)
-            result = process_excel_file(filepath)
+        quick_ratio = None
+        if current_assets is not None and inventory is not None and current_liab is not None:
+            quick_ratio = safe_div(current_assets - inventory, current_liab)
             
-            if result is not None:
-                output_name = filename.replace('.xlsx', '_KPIs.json')
-                output_path = os.path.join(quant_dir, output_name)
-                with open(output_path, 'w') as f:
-                    json.dump(result, f, indent=4)
-                print(f"Saved KPIs to {output_path}")
+        wc_to_ta = None
+        if current_assets is not None and current_liab is not None and total_assets is not None:
+            wc_to_ta = safe_div(current_assets - current_liab, total_assets)
+            
+        roce = safe_div(ebit, total_assets)
+        npm = safe_div(net_income, total_revenue)
+        tl_to_ta = safe_div(total_liab, total_assets)
+        
+        results.append({
+            "File_Name": basename,
+            "CIK_Identifier": cik,
+            "Fiscal_Year": year_val,
+            "Interest Coverage Ratio": interest_coverage,
+            "DSCR": dscr,
+            "Debt-to-Equity": debt_to_equity,
+            "Retained Earnings / Total Assets": re_to_ta,
+            "Current Ratio": current_ratio,
+            "Quick Ratio": quick_ratio,
+            "Working Capital / Total Assets": wc_to_ta,
+            "ROCE": roce,
+            "Net Profit Margin": npm,
+            "Total Liabilities / Total Assets": tl_to_ta
+        })
+        
+    return results, None
+
+def main():
+    project_root = Path(__file__).resolve().parents[1]
+    
+    target_dirs = [
+        project_root / 'data' / 'KPI_tables',
+        project_root / 'data' / 'KPI_tables_cold_start'
+    ]
+    
+    all_files = []
+    for d in target_dirs:
+        if d.exists():
+            all_files.extend(list(d.glob("*.xlsx")))
+            
+    # Ignore temp files
+    all_files = [f for f in all_files if not f.name.startswith("~$")]
+    
+    master_results = []
+    audit_log = []
+    
+    audit_log.append("=== EXTRACTION REPORT ===")
+    audit_log.append(f"Total .xlsx files discovered: {len(all_files)}\n")
+    
+    success_count = 0
+    failed_count = 0
+    
+    for filepath in all_files:
+        try:
+            results, errors = process_file(filepath)
+            if errors:
+                failed_count += 1
+                audit_log.append(f"[FAILED] {filepath.name}: Missing -> {', '.join(errors)}")
+            elif not results:
+                failed_count += 1
+                audit_log.append(f"[FAILED] {filepath.name}: No yearly data found.")
+            else:
+                success_count += 1
+                master_results.extend(results)
+        except Exception as e:
+            failed_count += 1
+            audit_log.append(f"[ERROR] {filepath.name}: Exception -> {str(e)}")
+            
+    audit_log.insert(2, f"Successfully processed: {success_count}")
+    audit_log.insert(3, f"Failed/Skipped: {failed_count}\n")
+    
+    # Save outputs
+    df_master = pd.DataFrame(master_results)
+    
+    csv_out = project_root / 'data' / 'credit_risk_kpis_master.csv'
+    json_out = project_root / 'data' / 'credit_risk_kpis_master.json'
+    report_out = project_root / 'data' / 'extraction_report.txt'
+    
+    df_master.to_csv(csv_out, index=False)
+    
+    # Save JSON hierarchical
+    df_master.to_json(json_out, orient='records', indent=4)
+    
+    # Save audit log
+    with open(report_out, 'w') as f:
+        f.write('\n'.join(audit_log))
+        
+    print(f"Success! Master dataset generated.")
+    print(f"Saved CSV: {csv_out}")
+    print(f"Saved JSON: {json_out}")
+    print(f"Saved Report: {report_out}")
+    
+    print("\nSample Markdown Table:")
+    print(df_master.head(10).to_markdown(index=False))
+
+if __name__ == '__main__':
+    main()
