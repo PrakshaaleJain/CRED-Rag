@@ -155,7 +155,7 @@ def main():
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
-            "max_tokens": 4096
+            "max_tokens": 2048
         }
         
         try:
