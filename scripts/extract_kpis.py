@@ -21,7 +21,7 @@ def identify_sheets(filepath):
                 bs_sheet = sheet
                 
         # Income Statement matcher
-        if any(kw in sheet_lower for kw in ["statement of operations", "statement of income", "statement of opera", "statement of earnings"]):
+        if any(kw in sheet_lower for kw in ["statement of operations", "statements of oper", "statement of oper", "statement of income", "statement of earnings"]):
             if "parenthetical" not in sheet_lower and "comprehensive" not in sheet_lower:
                 is_sheet = sheet
                 
@@ -165,6 +165,7 @@ def main():
     project_root = Path(__file__).resolve().parents[1]
     
     target_dirs = [
+        project_root / 'data',
         project_root / 'data' / 'KPI_tables',
         project_root / 'data' / 'KPI_tables_cold_start'
     ]
