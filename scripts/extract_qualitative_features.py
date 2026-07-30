@@ -56,6 +56,82 @@ Context:
 {context}
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedder):
+    cik = str(row[0]).zfill(10)
+    year = str(row[3])
+    rating = str(row[4])
+    source_indicator = str(row[6]) if len(row) > 6 else '1'
+    
+    if rating == 'NR' or source_indicator == '0':
+        return None
+        
+    out_file = out_dir / f"{cik}_{year}_features.json"
+    if out_file.exists():
+        # Already processed, silent return to prevent log spam when running concurrently
+        return f"{cik}_{year} (already processed)"
+        
+    tree_folder = trees_dir / f"{cik}_{year}_10-K_extracted"
+    if not tree_folder.exists():
+        return f"Tree not found for {cik}_{year}"
+        
+    try:
+        tree = load_tree(tree_folder)
+    except Exception as e:
+        return f"Failed to load tree for {cik}_{year}: {e}"
+        
+    node_ids = []
+    node_embs = []
+    
+    for n_id, node in tree.all_nodes.items():
+        if node.embeddings:
+            emb_key = list(node.embeddings.keys())[0]
+            node_ids.append(n_id)
+            node_embs.append(node.embeddings[emb_key])
+            
+    if not node_embs:
+        return f"No valid embeddings found in tree for {cik}_{year}."
+        
+    device = list(topic_embeddings.values())[0].device
+    corpus_tensor = torch.tensor(node_embs, device=device)
+    selected_nodes = set()
+    
+    # Pull top 2 nodes per topic (Reduced from 4 to 2 to halve prompt size and double generation speed)
+    for topic_name, q_emb in topic_embeddings.items():
+        cos_scores = util.cos_sim(q_emb, corpus_tensor)[0]
+        top_results = torch.topk(cos_scores, k=min(2, len(node_ids)))
+        
+        for score, idx_tensor in zip(top_results[0], top_results[1]):
+            selected_nodes.add(node_ids[idx_tensor.item()])
+            
+    retrieved_texts = [tree.all_nodes[n].text for n in selected_nodes]
+    context_str = "\n\n---\n\n".join(retrieved_texts)
+    
+    prompt = construct_prompt(context_str)
+    
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 2048
+    }
+    
+    try:
+        resp = requests.post(LLM_API_URL, json=payload, timeout=600)
+        resp.raise_for_status()
+        llm_output = resp.json()["choices"][0]["message"]["content"]
+        
+        parsed_json = json.loads(llm_output)
+        
+        with open(out_file, 'w', encoding='utf-8') as f:
+            json.dump(parsed_json, f, indent=4, ensure_ascii=False)
+        
+        return f"Successfully processed {cik}_{year}"
+    except Exception as e:
+        return f"LLM API failed for {cik}_{year}: {e}"
+
 def main():
     out_dir = project_root / 'data' / 'qualitative_features'
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +143,6 @@ def main():
         logging.error(f"{labels_csv} not found.")
         return
         
-    # Check if the LLM server is up
     try:
         base_url = LLM_API_URL.replace("/chat/completions", "/models")
         res = requests.get(base_url, timeout=3)
@@ -89,92 +164,21 @@ def main():
         
     data_rows = reader[1:]
     
-    for idx, row in enumerate(data_rows, 1):
-        cik = str(row[0]).zfill(10)
-        year = str(row[3])
-        rating = str(row[4])
-        source_indicator = str(row[6]) if len(row) > 6 else '1'
-        
-        if rating == 'NR' or source_indicator == '0':
-            continue
-            
-        out_file = out_dir / f"{cik}_{year}_features.json"
-        if out_file.exists():
-            logging.info(f"[{idx}/{len(data_rows)}] Skipping {cik}_{year} (already processed)")
-            continue
-            
-        tree_folder = trees_dir / f"{cik}_{year}_10-K_extracted"
-        if not tree_folder.exists():
-            logging.warning(f"[{idx}/{len(data_rows)}] Tree not found for {cik}_{year}. Skipping.")
-            continue
-            
-        logging.info(f"[{idx}/{len(data_rows)}] Processing {cik}_{year}...")
-        try:
-            tree = load_tree(tree_folder)
-        except Exception as e:
-            logging.error(f"Failed to load tree for {cik}_{year}: {e}")
-            continue
-            
-        # Gather all nodes and their embeddings
-        node_ids = []
-        node_embs = []
-        
-        for n_id, node in tree.all_nodes.items():
-            # The custom RAPTOR pipeline hardcodes the embedding key as 'FinE5' by default in TreeBuilderConfig
-            # even when using BAAI/bge-base-en-v1.5. We will grab whatever embedding key is present.
-            if node.embeddings:
-                emb_key = list(node.embeddings.keys())[0]
-                node_ids.append(n_id)
-                node_embs.append(node.embeddings[emb_key])
-                
-        if not node_embs:
-            logging.warning(f"No valid embeddings found in tree for {cik}_{year}.")
-            continue
-            
-        # Ensure corpus_tensor is on the same device as the query embeddings (e.g., cuda:0)
-        device = list(topic_embeddings.values())[0].device
-        corpus_tensor = torch.tensor(node_embs, device=device)
-        selected_nodes = set()
-        
-        # Pull top 4 nodes per topic
-        for topic_name, q_emb in topic_embeddings.items():
-            cos_scores = util.cos_sim(q_emb, corpus_tensor)[0]
-            top_results = torch.topk(cos_scores, k=min(4, len(node_ids)))
-            
-            for score, idx_tensor in zip(top_results[0], top_results[1]):
-                selected_nodes.add(node_ids[idx_tensor.item()])
-                
-        # Combine retrieved text
-        retrieved_texts = [tree.all_nodes[n].text for n in selected_nodes]
-        context_str = "\n\n---\n\n".join(retrieved_texts)
-        
-        prompt = construct_prompt(context_str)
-        
-        payload = {
-            "model": model_id,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1,
-            "max_tokens": 2048
+    logging.info(f"Beginning concurrent processing of {len(data_rows)} companies (this will be fast)...")
+    
+    # Process with 6 concurrent threads to saturate the LLM server's batch queue
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(
+                process_company, row, out_dir, trees_dir, model_id, topic_embeddings, embedder
+            ): row for row in data_rows
         }
         
-        try:
-            # Increased timeout to 600 seconds to prevent Read timed out on dense documents
-            resp = requests.post(LLM_API_URL, json=payload, timeout=600)
-            resp.raise_for_status()
-            llm_output = resp.json()["choices"][0]["message"]["content"]
-            
-            # Verify it's valid JSON
-            parsed_json = json.loads(llm_output)
-            
-            # Save it
-            with open(out_file, 'w', encoding='utf-8') as f:
-                json.dump(parsed_json, f, indent=4, ensure_ascii=False)
-                
-        except Exception as e:
-            logging.error(f"LLM API failed for {cik}_{year}: {e}")
+        for idx, future in enumerate(as_completed(futures), 1):
+            result = future.result()
+            if result:
+                logging.info(f"[{idx}/{len(data_rows)}] {result}")
             
     logging.info("Batch extraction complete!")
-
 if __name__ == '__main__':
     main()
