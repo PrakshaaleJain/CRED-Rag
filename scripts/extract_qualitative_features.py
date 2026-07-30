@@ -44,13 +44,15 @@ Based on the provided multi-resolution 10-K context, extract and summarize manag
 Revenue: What is driving sales growth or contraction? (Look for high-level market trends and granular product/segment details).
 Operating Profit: What factors are impacting operational efficiency and core business profitability?
 Net/Gross Margins: How is pricing power, inflation, or cost of goods sold (COGS) affecting their margins?
-Net Profit: What is management's narrative around bottom-line earnings, taxes, and one-time expenses?
-Free Cash Flow: What is the commentary regarding cash generation, capital expenditures, debt repayment, and liquidity?
+    return f"""Based on the provided multi-resolution 10-K context, extract and summarize management's commentary and forward-looking statements regarding the following topics.
+For speed and brevity, you MUST limit your response to EXACTLY ONE SHORT SENTENCE per topic. Be extremely concise.
 
-Constraints:
-- Synthesize the information intelligently. Use the high-level summaries for the overarching narrative, and use the granular chunks to provide specific examples.
-- Do not just list the numbers. I need the qualitative context—the 'why' behind the numbers.
-- If a topic is not discussed in the text, explicitly state 'No qualitative commentary found for this topic.'
+Respond STRICTLY with a JSON object using these exact keys:
+1. "Revenue": What is driving sales growth or contraction? (ONE sentence)
+2. "Operating Profit": What factors are impacting operational efficiency? (ONE sentence)
+3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins? (ONE sentence)
+4. "Net Profit": What is management's narrative around bottom-line earnings? (ONE sentence)
+5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity? (ONE sentence)
 
 Context:
 {context}
@@ -58,7 +60,7 @@ Context:
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedder):
+def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedder, api_url):
     cik = str(row[0]).zfill(10)
     year = str(row[3])
     rating = str(row[4])
@@ -119,7 +121,7 @@ def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedde
     }
     
     try:
-        resp = requests.post(LLM_API_URL, json=payload, timeout=600)
+        resp = requests.post(api_url, json=payload, timeout=600)
         resp.raise_for_status()
         llm_output = resp.json()["choices"][0]["message"]["content"]
         
@@ -144,13 +146,13 @@ def main():
         return
         
     try:
-        base_url = LLM_API_URL.replace("/chat/completions", "/models")
+        base_url = LLM_API_URLS[0].replace("/chat/completions", "/models")
         res = requests.get(base_url, timeout=3)
         res.raise_for_status()
         model_id = res.json()["data"][0]["id"]
         logging.info(f"Connected to LLM Server. Using model: {model_id}")
     except Exception as e:
-        logging.error(f"Cannot connect to local LLM server at {LLM_API_URL}: {e}")
+        logging.error(f"Cannot connect to local LLM server at {LLM_API_URLS[0]}: {e}")
         logging.error("Please ensure llama-cpp-python server is running.")
         return
 
@@ -167,10 +169,11 @@ def main():
     logging.info(f"Beginning concurrent processing of {len(data_rows)} companies (this will be fast)...")
     
     # Process with 6 concurrent threads to saturate the LLM server's batch queue
+    url_cycler = itertools.cycle(LLM_API_URLS)
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(
-                process_company, row, out_dir, trees_dir, model_id, topic_embeddings, embedder
+                process_company, row, out_dir, trees_dir, model_id, topic_embeddings, embedder, next(url_cycler)
             ): row for row in data_rows
         }
         
