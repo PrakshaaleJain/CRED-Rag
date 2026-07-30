@@ -31,7 +31,7 @@ def get_edgar_data(cik_int, target_year, headers):
 
 def main():
     project_root = Path(__file__).resolve().parents[1]
-    labels_csv = project_root / "data" / "valid_training_labels.csv"
+    labels_csv = project_root / "data" / "ground_truth_labels.csv"
     out_dir = project_root / "data" / "KPI_tables"
     
     out_dir.mkdir(parents=True, exist_ok=True)
