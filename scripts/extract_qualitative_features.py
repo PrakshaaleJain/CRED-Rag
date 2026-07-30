@@ -29,21 +29,14 @@ TOPICS = {
     "Free Cash Flow": "Free Cash Flow: What is the commentary regarding cash generation, capital expenditures, debt repayment, and liquidity?"
 }
 
-LLM_API_URL = "http://localhost:8001/v1/chat/completions"
+LLM_API_URLS = [
+    "http://localhost:8001/v1/chat/completions",
+    "http://localhost:8002/v1/chat/completions"
+]
+
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 def construct_prompt(context: str) -> str:
-    return f"""You are an expert corporate credit risk analyst. I will provide you with a multi-resolution context retrieved from an SEC 10-K filing. This context contains a mix of high-level abstract summaries and highly specific granular text chunks. Your task is to synthesize this information to extract the company management's qualitative commentary and forward-looking statements regarding specific financial health indicators.
-
-Your task is to synthesize this information and output a JSON object with EXACTLY 5 keys:
-"Revenue", "Operating Profit", "Net/Gross Margins", "Net Profit", "Free Cash Flow".
-The value for each key should be your qualitative summary. Do not output anything outside of the JSON object.
-
-Based on the provided multi-resolution 10-K context, extract and summarize management's commentary, explanations, and strategic outlook on the following five topics:
-
-Revenue: What is driving sales growth or contraction? (Look for high-level market trends and granular product/segment details).
-Operating Profit: What factors are impacting operational efficiency and core business profitability?
-Net/Gross Margins: How is pricing power, inflation, or cost of goods sold (COGS) affecting their margins?
     return f"""Based on the provided multi-resolution 10-K context, extract and summarize management's commentary and forward-looking statements regarding the following topics.
 For speed and brevity, you MUST limit your response to EXACTLY ONE SHORT SENTENCE per topic. Be extremely concise.
 
