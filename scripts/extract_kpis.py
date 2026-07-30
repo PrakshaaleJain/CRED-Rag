@@ -63,7 +63,7 @@ def extract_debt(df, col_idx):
     st_debt = extract_value(df, ["short-term debt", "current portion of long-term debt"], col_idx)
     
     if lt_debt is None and st_debt is None:
-        return None
+        return 0.0
     return (lt_debt or 0.0) + (st_debt or 0.0)
 
 def safe_div(num, den):
@@ -111,22 +111,27 @@ def process_file(filepath):
         year_val = filing_year - (col_idx - 1)
         
         total_assets = extract_value(df_bs, ["total assets"], col_idx)
-        total_equity = extract_value(df_bs, ["total equity", "total stockholders' equity", "stockholders' equity"], col_idx)
+        total_equity = extract_value(df_bs, ["total equity", "total stockholders' equity", "stockholders' equity", "total shareholders' equity", "total members' equity", "total partners' capital", "total deficit"], col_idx)
         
-        total_liab = extract_value(df_bs, ["total liabilities"], col_idx)
+        total_liab = extract_value(df_bs, ["total liabilities", "total liabilities and commitments"], col_idx)
         if total_liab is None and total_assets is not None and total_equity is not None:
             total_liab = total_assets - total_equity
             
         current_assets = extract_value(df_bs, ["total current assets"], col_idx)
         current_liab = extract_value(df_bs, ["total current liabilities"], col_idx)
         inventory = extract_value(df_bs, ["inventories", "inventory"], col_idx)
-        retained_earnings = extract_value(df_bs, ["retained earnings", "accumulated deficit"], col_idx)
+        if inventory is None:
+            inventory = 0.0
+            
+        retained_earnings = extract_value(df_bs, ["retained earnings", "accumulated deficit", "accumulated earnings", "retained deficit", "retained earnings (deficit)"], col_idx)
         
         total_debt = extract_debt(df_bs, col_idx)
         
-        total_revenue = extract_value(df_is, ["total revenues", "total revenues and other income", "sales and other operating revenues", "revenues", "net sales", "sales", "product sales"], col_idx)
-        net_income = extract_value(df_is, ["net income", "net income (loss)", "net income attributable to"], col_idx)
+        total_revenue = extract_value(df_is, ["total revenues", "total revenues and other income", "sales and other operating revenues", "revenues", "net sales", "sales", "product sales", "total net sales", "operating revenues", "total operating revenues"], col_idx)
+        net_income = extract_value(df_is, ["net income", "net income (loss)", "net income attributable to", "net earnings", "net loss", "net income (loss) attributable to"], col_idx)
         interest_exp = extract_value(df_is, ["interest expense", "interest and debt expense", "interest and other", "interest income (expense)", "interest expense, net"], col_idx)
+        if interest_exp is None:
+            interest_exp = 0.0
         
         da = None
         if df_cf is not None:
@@ -135,6 +140,8 @@ def process_file(filepath):
             da = extract_value(df_is, ["depreciation and amortization", "depreciation", "amortization"], col_idx)
             
         taxes = extract_value(df_is, ["income tax expense", "provision for income taxes", "income taxes"], col_idx)
+        if taxes is None:
+            taxes = 0.0
         
         if total_assets is None and net_income is None:
             continue
