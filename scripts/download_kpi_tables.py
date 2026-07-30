@@ -31,10 +31,12 @@ def get_edgar_data(cik_int, target_year, headers):
 
 def main():
     project_root = Path(__file__).resolve().parents[1]
-    labels_csv = project_root / "data" / "ground_truth_labels.csv"
-    out_dir = project_root / "data" / "KPI_tables"
+    labels_csv = project_root / "data" / "cold_start_training_labels.csv"
+    out_dir_rated = project_root / "data" / "KPI_tables"
+    out_dir_nr = project_root / "data" / "KPI_tables_cold_start"
     
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir_rated.mkdir(parents=True, exist_ok=True)
+    out_dir_nr.mkdir(parents=True, exist_ok=True)
     
     # Custom headers required by SEC
     headers = {'User-Agent': 'CRED-Rag/1.0 (test@example.com)'}
@@ -50,7 +52,14 @@ def main():
     for index, row in df.iterrows():
         cik = int(row['CIK'])
         year = row['Year']
-        out_filepath = out_dir / f"{cik}_{year}_10K.xlsx"
+        
+        # Check if it's an NR company (SOURCE_INDICATOR == 0)
+        is_nr = (str(row.get('SOURCE_INDICATOR', '1')) == '0')
+        
+        if is_nr:
+            out_filepath = out_dir_nr / f"{cik}_{year}_10K.xlsx"
+        else:
+            out_filepath = out_dir_rated / f"{cik}_{year}_10K.xlsx"
         
         if out_filepath.exists():
             skipped += 1
