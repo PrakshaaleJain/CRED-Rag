@@ -119,9 +119,12 @@ def main():
         node_embs = []
         
         for n_id, node in tree.all_nodes.items():
-            if EMBEDDING_MODEL_NAME in node.embeddings:
+            # The custom RAPTOR pipeline hardcodes the embedding key as 'FinE5' by default in TreeBuilderConfig
+            # even when using BAAI/bge-base-en-v1.5. We will grab whatever embedding key is present.
+            if node.embeddings:
+                emb_key = list(node.embeddings.keys())[0]
                 node_ids.append(n_id)
-                node_embs.append(node.embeddings[EMBEDDING_MODEL_NAME])
+                node_embs.append(node.embeddings[emb_key])
                 
         if not node_embs:
             logging.warning(f"No valid embeddings found in tree for {cik}_{year}.")
