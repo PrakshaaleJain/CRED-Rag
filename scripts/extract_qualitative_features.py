@@ -30,10 +30,7 @@ TOPICS = {
     "Free Cash Flow": "Free Cash Flow: What is the commentary regarding cash generation, capital expenditures, debt repayment, and liquidity?"
 }
 
-LLM_API_URLS = [
-    "http://localhost:8001/v1/chat/completions",
-    "http://localhost:8002/v1/chat/completions"
-]
+LLM_API_URL = "http://localhost:8001/v1/chat/completions"
 
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
@@ -140,13 +137,13 @@ def main():
         return
         
     try:
-        base_url = LLM_API_URLS[0].replace("/chat/completions", "/models")
+        base_url = LLM_API_URL.replace("/chat/completions", "/models")
         res = requests.get(base_url, timeout=3)
         res.raise_for_status()
         model_id = res.json()["data"][0]["id"]
         logging.info(f"Connected to LLM Server. Using model: {model_id}")
     except Exception as e:
-        logging.error(f"Cannot connect to local LLM server at {LLM_API_URLS[0]}: {e}")
+        logging.error(f"Cannot connect to local LLM server at {LLM_API_URL}: {e}")
         logging.error("Please ensure llama-cpp-python server is running.")
         return
 
@@ -162,12 +159,11 @@ def main():
     
     logging.info(f"Beginning concurrent processing of {len(data_rows)} companies (this will be fast)...")
     
-    # Process with 6 concurrent threads to saturate the LLM server's batch queue
-    url_cycler = itertools.cycle(LLM_API_URLS)
+    # Process with 6 concurrent threads to saturate the single LLM server's batch queue
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(
-                process_company, row, out_dir, trees_dir, model_id, topic_embeddings, embedder, next(url_cycler)
+                process_company, row, out_dir, trees_dir, model_id, topic_embeddings, embedder, LLM_API_URL
             ): row for row in data_rows
         }
         
