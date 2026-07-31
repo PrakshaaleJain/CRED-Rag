@@ -70,14 +70,19 @@ def main():
     # 3. Train-Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
-    # 4. Train Hybrid XGBoost
-    logging.info("Training Hybrid XGBoost model (max_depth=6, n_estimators=300)...")
+    # 4. Train Hybrid XGBoost with Anti-Overfitting Regularization
+    logging.info("Training Regularized Hybrid XGBoost model...")
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=len(UNIQUE_CLASSES),
-        max_depth=6,
+        max_depth=3,                  # Shallower trees to prevent memorization
         n_estimators=300,
         learning_rate=0.05,
+        subsample=0.8,                # Train on 80% of rows per tree
+        colsample_bytree=0.8,         # Use 80% of features per tree
+        min_child_weight=3,           # Require more samples in leaves
+        reg_lambda=2.0,               # Strong L2 regularization
+        gamma=0.1,                    # Minimum loss reduction for a split
         random_state=42,
         eval_metric='mlogloss'
     )
