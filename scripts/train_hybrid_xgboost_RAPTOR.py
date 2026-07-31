@@ -9,6 +9,7 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import SMOTE
 import xgboost as xgb
 
@@ -75,6 +76,12 @@ def main():
     X = X[valid_mask]
     y = y[valid_mask]
     
+    # Re-encode labels to 0...N-1 to satisfy XGBoost requirement
+    le = LabelEncoder()
+    y = le.fit_transform(y)
+    active_classes = list(range(len(le.classes_)))
+    active_class_names = [REVERSE_RATING_MAP[orig] for orig in le.classes_]
+    
     # 3. Train-Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
@@ -87,7 +94,7 @@ def main():
     logging.info("Training Hybrid XGBoost model with balanced capacity...")
     model = xgb.XGBClassifier(
         objective='multi:softprob',
-        num_class=len(UNIQUE_CLASSES),
+        num_class=len(active_classes),
         max_depth=5,                  # Allow deeper trees to capture Quant + Qual interactions
         n_estimators=500,             # High rounds (early stopping will halt naturally)
         learning_rate=0.1,
@@ -117,9 +124,9 @@ def main():
     y_pred = model.predict(X_test)
     
     # Plot 1: Confusion Matrix
-    cm = confusion_matrix(y_test, y_pred, labels=UNIQUE_CLASSES)
+    cm = confusion_matrix(y_test, y_pred, labels=active_classes)
     plt.figure(figsize=(14, 12))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges', xticklabels=CLASS_NAMES, yticklabels=CLASS_NAMES)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges', xticklabels=active_class_names, yticklabels=active_class_names)
     plt.title('Hybrid (Quant + Qual) XGBoost Confusion Matrix', fontsize=16)
     plt.ylabel('True Rating', fontsize=12)
     plt.xlabel('Predicted Rating', fontsize=12)
@@ -165,7 +172,7 @@ def main():
     plt.close()
     
     # Plot 4: Classification Report (CSV)
-    report = classification_report(y_test, y_pred, labels=UNIQUE_CLASSES, target_names=CLASS_NAMES, output_dict=True, zero_division=0)
+    report = classification_report(y_test, y_pred, labels=active_classes, target_names=active_class_names, output_dict=True, zero_division=0)
     report_df = pd.DataFrame(report).transpose()
     report_df.to_csv(out_dir / 'hybrid_classification_report.csv')
     
