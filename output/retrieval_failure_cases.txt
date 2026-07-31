@@ -1,0 +1,18 @@
+Question ID: Q_FACTUAL_ZETA_002 (Factual)
+Naive Relevance: 5 | RAPTOR Relevance: 1
+---
+Question ID: Q_CONCEPTUAL_ZETA_005 (Conceptual)
+Naive Relevance: 5 | RAPTOR Relevance: 3
+---
+Question ID: Q_STRATEGIC_ZETA_003 (Strategic)
+Naive Relevance: 5 | RAPTOR Relevance: 1
+---
+Question ID: Q_STRATEGIC_ZETA_005 (Strategic)
+Naive Relevance: 5 | RAPTOR Relevance: 1
+---
+Question ID: Q_FACTUAL_HAVA_001 (Factual)
+Naive Relevance: 5 | RAPTOR Relevance: 1
+---
+Question ID: Q_FACTUAL_HAVA_002 (Factual)
+Naive Relevance: 5 | RAPTOR Relevance: 4
+---
