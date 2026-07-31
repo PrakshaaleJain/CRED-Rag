@@ -24,3 +24,4 @@ tqdm
 faiss-cpu
 langchain
 langchain-community
+langchain-text-splitters
