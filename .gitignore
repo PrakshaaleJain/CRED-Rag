@@ -6,3 +6,4 @@ sec_filings_md/
 sec_filings/
 data/
 *.gguf
+models/
