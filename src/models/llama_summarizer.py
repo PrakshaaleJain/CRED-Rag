@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from .base_summarizer import BaseSummarizationModel
 
 DEFAULT_SUMMARIZER_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
-VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
+LLAMA_API_URL = "http://localhost:8001/v1/chat/completions"
 
 SUMMARIZATION_SYSTEM_PROMPT = (
     "You are a financial analyst summarizing SEC 10-K filing excerpts for "
@@ -26,8 +26,8 @@ class LlamaSummarizationModel(BaseSummarizationModel):
         **kwargs
     ) -> None:
         self.model_name = os.getenv("LLAMA_MODEL_NAME", model_name)
-        self.api_url = os.getenv("VLLM_API_URL", VLLM_API_URL)
-        print(f"Connecting to vLLM server at {self.api_url} for model {self.model_name}...")
+        self.api_url = os.getenv("LLAMA_API_URL", LLAMA_API_URL)
+        print(f"Connecting to Llama-CPP server at {self.api_url} for model {self.model_name}...")
         
         # Load a public ungated Llama-3 tokenizer for accurate token counting during chunking
         self.tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
@@ -57,8 +57,8 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            print(f"[Error] vLLM API connection failed: {e}")
-            print(f"Ensure your vLLM server is running at {self.api_url}")
+            print(f"[Error] Llama-CPP API connection failed: {e}")
+            print(f"Ensure your Llama-CPP server is running at {self.api_url}")
             return ""
 
     def generate(self, prompt: str, max_tokens: int = 512, system_prompt: Optional[str] = None) -> str:
@@ -80,5 +80,5 @@ class LlamaSummarizationModel(BaseSummarizationModel):
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            print(f"[Error] vLLM API connection failed: {e}")
+            print(f"[Error] Llama-CPP API connection failed: {e}")
             return ""

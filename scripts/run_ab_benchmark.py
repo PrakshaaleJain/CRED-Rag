@@ -15,7 +15,7 @@ from src.raptor_pipeline.utils import get_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
-VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
+LLAMA_API_URL = "http://localhost:8001/v1/chat/completions"
 LLAMA_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
 def generate_answer(query: str, contexts: list[str]) -> str:
@@ -38,12 +38,12 @@ def generate_answer(query: str, contexts: list[str]) -> str:
     }
     
     try:
-        response = requests.post(VLLM_API_URL, json=payload, timeout=60)
+        response = requests.post(LLAMA_API_URL, json=payload, timeout=60)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        logging.error(f"vLLM API error: {e}")
-        return "ERROR: vLLM Server Offline or Timeout"
+        logging.error(f"Llama-CPP API error: {e}")
+        return "ERROR: Llama-CPP Server Offline or Timeout"
 
 def build_naive_faiss(text: str, embeddings):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
@@ -61,8 +61,8 @@ def build_raptor_faiss(text: str, embeddings):
         tree = builder.build_from_text(text)
         all_texts = [node.text for node in tree.all_nodes.values()]
     except Exception as e:
-        logging.error(f"RAPTOR Tree generation failed (likely due to offline vLLM): {e}")
-        all_texts = ["Error: Could not generate RAPTOR summaries due to offline vLLM server."]
+        logging.error(f"RAPTOR Tree generation failed (likely due to offline Llama-CPP): {e}")
+        all_texts = ["Error: Could not generate RAPTOR summaries due to offline Llama-CPP server."]
         
     return FAISS.from_texts(all_texts, embeddings)
 

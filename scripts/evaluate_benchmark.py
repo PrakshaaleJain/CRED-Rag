@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
-VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
+LLAMA_API_URL = "http://localhost:8001/v1/chat/completions"
 LLAMA_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
 EVAL_PROMPT_TEMPLATE = """You are an expert RAG evaluation judge. You will be provided with a Question, the expected Ground Truth, the Retrieved Contexts, and the Generated Answer from a RAG pipeline.
@@ -56,7 +56,7 @@ def call_llm_judge(query, ground_truth, contexts, answer) -> dict:
     }
     
     try:
-        response = requests.post(VLLM_API_URL, json=payload, timeout=60)
+        response = requests.post(LLAMA_API_URL, json=payload, timeout=60)
         response.raise_for_status()
         text = response.json()["choices"][0]["message"]["content"].strip()
         # Find JSON block

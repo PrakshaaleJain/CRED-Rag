@@ -6,7 +6,7 @@ langchain_core
 beautifulsoup4
 lxml
 torch
-transformers>=5.5.3
+transformers<5.0.0
 accelerate
 scikit-learn
 scipy
@@ -15,7 +15,7 @@ protobuf
 sentence-transformers==3.1.1
 openpyxl
 markitdown[all]
-vllm
+llama-cpp-python[server]
 tabulate
 seaborn
 xgboost
