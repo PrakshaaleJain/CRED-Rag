@@ -87,13 +87,13 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
     # 4. Train Weak Baseline XGBoost
-    logging.info("Training intentionally weak XGBoost baseline (max_depth=2, n_estimators=50)...")
+    logging.info("Training XGBoost baseline (max_depth=4, n_estimators=150)...")
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=len(UNIQUE_CLASSES),
-        max_depth=2,
-        n_estimators=50,
-        learning_rate=0.3,
+        max_depth=4,
+        n_estimators=150,
+        learning_rate=0.1,
         random_state=42,
         eval_metric='mlogloss'
     )
