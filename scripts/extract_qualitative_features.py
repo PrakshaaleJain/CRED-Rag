@@ -88,23 +88,22 @@ def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedde
         
     device = list(topic_embeddings.values())[0].device
     corpus_tensor = torch.tensor(node_embs, device=device)
-    selected_nodes = set()
-    
-    # Pull top 2 nodes per topic (Reduced from 4 to 2 to halve prompt size and double generation speed)
-    for topic_name, q_emb in topic_embeddings.items():
-        cos_scores = util.cos_sim(q_emb, corpus_tensor)[0]
-        top_results = torch.topk(cos_scores, k=min(2, len(node_ids)))
-        
-        for score, idx_tensor in zip(top_results[0], top_results[1]):
-            selected_nodes.add(node_ids[idx_tensor.item()])
-            
-    retrieved_texts = [tree.all_nodes[n].text for n in selected_nodes]
-    context_str = "\n\n---\n\n".join(retrieved_texts)
-    
-    prompt = construct_prompt(context_str)
-    
     base_temperature = 0.1
     for attempt in range(3):
+        current_k = 2 if attempt == 0 else 1
+        
+        selected_nodes = set()
+        for topic_name, q_emb in topic_embeddings.items():
+            cos_scores = util.cos_sim(q_emb, corpus_tensor)[0]
+            top_results = torch.topk(cos_scores, k=min(current_k, len(node_ids)))
+            
+            for score, idx_tensor in zip(top_results[0], top_results[1]):
+                selected_nodes.add(node_ids[idx_tensor.item()])
+                
+        retrieved_texts = [tree.all_nodes[n_id].text for n_id in selected_nodes]
+        context_str = "\n\n---\n\n".join(retrieved_texts)
+        prompt = construct_prompt(context_str)
+        
         payload = {
             "model": model_id,
             "messages": [{"role": "user", "content": prompt}],
