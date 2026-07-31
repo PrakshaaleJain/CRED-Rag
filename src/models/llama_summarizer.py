@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from .base_summarizer import BaseSummarizationModel
 
 DEFAULT_SUMMARIZER_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
-VLLM_API_URL = "http://localhost:8000/v1/chat/completions"
+VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
 
 SUMMARIZATION_SYSTEM_PROMPT = (
     "You are a financial analyst summarizing SEC 10-K filing excerpts for "
