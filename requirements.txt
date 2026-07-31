@@ -18,3 +18,5 @@ markitdown[all]
 vllm
 tabulate
 seaborn
+xgboost
+imbalanced-learn

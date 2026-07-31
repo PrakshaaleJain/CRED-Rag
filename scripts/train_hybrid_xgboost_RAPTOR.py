@@ -9,6 +9,7 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import confusion_matrix, classification_report
+from imblearn.over_sampling import SMOTE
 import xgboost as xgb
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
@@ -28,7 +29,7 @@ def main():
     
     hybrid_csv = project_root / 'data' / 'hybrid_training_features.csv'
     
-    out_dir = project_root / 'output' / 'graphs'
+    out_dir = project_root / 'output' / 'graphs' / 'xgboost'
     out_dir.mkdir(parents=True, exist_ok=True)
     models_dir = project_root / 'models'
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -67,8 +68,20 @@ def main():
     imputer = SimpleImputer(strategy='median')
     X = imputer.fit_transform(X)
     
+    # Drop ultra-rare classes with < 5 instances (SMOTE requires at least k_neighbors+1 instances)
+    unique, counts = np.unique(y, return_counts=True)
+    valid_classes = unique[counts >= 5]
+    valid_mask = np.isin(y, valid_classes)
+    X = X[valid_mask]
+    y = y[valid_mask]
+    
     # 3. Train-Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    
+    # Apply SMOTE to training data only
+    logging.info("Applying SMOTE to balance training classes...")
+    smote = SMOTE(random_state=42, k_neighbors=3)
+    X_train, y_train = smote.fit_resample(X_train, y_train)
     
     # 4. Train Hybrid XGBoost
     logging.info("Training Hybrid XGBoost model with balanced capacity...")
