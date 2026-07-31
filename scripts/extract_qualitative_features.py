@@ -103,27 +103,33 @@ def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedde
     
     prompt = construct_prompt(context_str)
     
-    payload = {
-        "model": model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1,
-        "max_tokens": 2048
-    }
-    
-    try:
-        resp = requests.post(api_url, json=payload, timeout=600)
-        resp.raise_for_status()
-        llm_output = resp.json()["choices"][0]["message"]["content"]
+    base_temperature = 0.1
+    for attempt in range(3):
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": base_temperature + (attempt * 0.2),
+            "max_tokens": 2048
+        }
         
-        parsed_json = json.loads(llm_output)
-        
-        with open(out_file, 'w', encoding='utf-8') as f:
-            json.dump(parsed_json, f, indent=4, ensure_ascii=False)
-        
-        return f"Successfully processed {cik}_{year}"
-    except Exception as e:
-        return f"LLM API failed for {cik}_{year}: {e}"
+        try:
+            resp = requests.post(api_url, json=payload, timeout=600)
+            resp.raise_for_status()
+            llm_output = resp.json()["choices"][0]["message"]["content"]
+            
+            parsed_json = json.loads(llm_output)
+            
+            with open(out_file, 'w', encoding='utf-8') as f:
+                json.dump(parsed_json, f, indent=4, ensure_ascii=False)
+            
+            return f"Successfully processed {cik}_{year}"
+        except json.JSONDecodeError as e:
+            if attempt == 2:
+                return f"LLM API failed for {cik}_{year} after 3 retries: {e}"
+            logging.warning(f"JSON decode failed for {cik}_{year}, retrying... (attempt {attempt + 1})")
+        except Exception as e:
+            return f"LLM API failed for {cik}_{year}: {e}"
 
 def main():
     out_dir = project_root / 'data' / 'qualitative_features'
