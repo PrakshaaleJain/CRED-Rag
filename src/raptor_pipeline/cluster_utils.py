@@ -160,6 +160,37 @@ class RAPTORClustering:
                     for node in cluster_nodes
                 )
                 if total_length > max_length_in_cluster:
+                    if len(cluster_nodes) == len(nodes):
+                        # Infinite recursion guard: clustering failed to split this group.
+                        # We manually split it in half to ensure we eventually get under max_length.
+                        mid = len(cluster_nodes) // 2
+                        if mid > 0:
+                            node_clusters.extend(
+                                RAPTORClustering.perform_clustering(
+                                    cluster_nodes[:mid],
+                                    embedding_model_name,
+                                    max_length_in_cluster=max_length_in_cluster,
+                                    tokenizer=tokenizer,
+                                    reduction_dimension=reduction_dimension,
+                                    threshold=threshold,
+                                    verbose=verbose,
+                                )
+                            )
+                            node_clusters.extend(
+                                RAPTORClustering.perform_clustering(
+                                    cluster_nodes[mid:],
+                                    embedding_model_name,
+                                    max_length_in_cluster=max_length_in_cluster,
+                                    tokenizer=tokenizer,
+                                    reduction_dimension=reduction_dimension,
+                                    threshold=threshold,
+                                    verbose=verbose,
+                                )
+                            )
+                        else:
+                            node_clusters.append(cluster_nodes)
+                        continue
+
                     if verbose:
                         logger.info(
                             "Reclustering cluster with %s nodes",
