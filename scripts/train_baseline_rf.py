@@ -124,7 +124,13 @@ def main():
     report_df.to_csv(out_dir / 'baseline_rf_classification_report.csv')
     
     acc = report['accuracy']
-    logging.info(f"Baseline RF Accuracy: {acc:.2%}")
+    macro_f1 = report['macro avg']['f1-score']
+    weighted_f1 = report['weighted avg']['f1-score']
+    
+    logging.info(f"Baseline RF Accuracy:     {acc:.2%}")
+    logging.info(f"Baseline RF Macro F1:     {macro_f1:.4f}  <-- (Preferred for imbalanced classes)")
+    logging.info(f"Baseline RF Weighted F1:  {weighted_f1:.4f}")
+    
     logging.info(f"Plots saved to {out_dir}/")
     logging.info("Baseline training complete!")
 
