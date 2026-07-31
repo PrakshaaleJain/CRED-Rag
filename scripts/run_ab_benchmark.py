@@ -8,7 +8,7 @@ from tqdm import tqdm
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 
 from src.raptor_pipeline.tree_builder import ClusterTreeBuilder, TreeBuilderConfig
 from src.raptor_pipeline.utils import get_text
