@@ -70,22 +70,22 @@ def main():
     # 3. Train-Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
-    # 4. Train Hybrid XGBoost with Anti-Overfitting Regularization
-    logging.info("Training Regularized Hybrid XGBoost model...")
+    # 4. Train Hybrid XGBoost
+    logging.info("Training Hybrid XGBoost model with balanced capacity...")
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=len(UNIQUE_CLASSES),
-        max_depth=3,                  # Shallower trees to prevent memorization
-        n_estimators=300,
-        learning_rate=0.05,
-        subsample=0.8,                # Train on 80% of rows per tree
-        colsample_bytree=0.8,         # Use 80% of features per tree
-        min_child_weight=3,           # Require more samples in leaves
-        reg_lambda=2.0,               # Strong L2 regularization
-        gamma=0.1,                    # Minimum loss reduction for a split
+        max_depth=5,                  # Allow deeper trees to capture Quant + Qual interactions
+        n_estimators=500,             # High rounds (early stopping will halt naturally)
+        learning_rate=0.1,
+        subsample=0.9,                # Relaxed regularization
+        colsample_bytree=0.9,
+        min_child_weight=1,           # Back to default
+        reg_lambda=1.0,               # Standard L2
+        gamma=0.0,                    # Standard split threshold
         random_state=42,
         eval_metric='mlogloss',
-        early_stopping_rounds=20      # Halt training when validation loss stops improving
+        early_stopping_rounds=30      # Increased patience
     )
     
     eval_set = [(X_train, y_train), (X_test, y_test)]
