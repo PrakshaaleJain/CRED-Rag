@@ -84,15 +84,15 @@ def main():
         reg_lambda=2.0,               # Strong L2 regularization
         gamma=0.1,                    # Minimum loss reduction for a split
         random_state=42,
-        eval_metric='mlogloss'
+        eval_metric='mlogloss',
+        early_stopping_rounds=20      # Halt training when validation loss stops improving
     )
     
     eval_set = [(X_train, y_train), (X_test, y_test)]
-    # Use early stopping to halt training when validation loss stops improving
+    # Fit the model
     model.fit(
         X_train, y_train, 
-        eval_set=eval_set, 
-        early_stopping_rounds=20,
+        eval_set=eval_set,
         verbose=False
     )
     
