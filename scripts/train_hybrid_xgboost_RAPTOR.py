@@ -88,7 +88,13 @@ def main():
     )
     
     eval_set = [(X_train, y_train), (X_test, y_test)]
-    model.fit(X_train, y_train, eval_set=eval_set, verbose=False)
+    # Use early stopping to halt training when validation loss stops improving
+    model.fit(
+        X_train, y_train, 
+        eval_set=eval_set, 
+        early_stopping_rounds=20,
+        verbose=False
+    )
     
     # Save Model
     model.save_model(models_dir / 'hybrid_xgb.json')
