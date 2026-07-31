@@ -104,23 +104,33 @@ def main():
     row_lookup = {f"{row['Company_ID']}_{row['Year']}": row for row in final_scores}
     
     if inference_texts:
-        # Run the pipeline iterator
-        results = finbert(inference_texts, batch_size=128, truncation=True, max_length=512)
+        # Run the pipeline iterator with top_k=None to get all scores
+        results = finbert(inference_texts, batch_size=128, truncation=True, max_length=512, top_k=None)
         
         # Calculate continuous scores
         for idx, result in enumerate(results):
             cik, year, topic = inference_metadata[idx]
             
-            # The result is a list of dictionaries [{'label': 'positive', 'score': 0.8}, ...]
             prob_pos = 0.0
             prob_neg = 0.0
             
-            for score_dict in result:
-                label = score_dict['label'].lower()
+            # If it returned a list of dicts (all scores)
+            if isinstance(result, list):
+                for score_dict in result:
+                    if isinstance(score_dict, dict):
+                        label = score_dict.get('label', '').lower()
+                        if label == 'positive':
+                            prob_pos = score_dict.get('score', 0.0)
+                        elif label == 'negative':
+                            prob_neg = score_dict.get('score', 0.0)
+            
+            # If it returned a single dict (top_1 fallback)
+            elif isinstance(result, dict):
+                label = result.get('label', '').lower()
                 if label == 'positive':
-                    prob_pos = score_dict['score']
+                    prob_pos = result.get('score', 0.0)
                 elif label == 'negative':
-                    prob_neg = score_dict['score']
+                    prob_neg = result.get('score', 0.0)
                     
             continuous_score = prob_pos - prob_neg
             continuous_score = round(continuous_score, 4)
