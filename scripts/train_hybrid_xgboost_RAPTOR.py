@@ -91,21 +91,21 @@ def main():
     X_train, y_train = smote.fit_resample(X_train, y_train)
     
     # 4. Train Hybrid XGBoost
-    logging.info("Training Hybrid XGBoost model with balanced capacity...")
+    logging.info("Training Hybrid XGBoost model with MAX capacity for >80% accuracy...")
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=len(active_classes),
-        max_depth=5,                  # Allow deeper trees to capture Quant + Qual interactions
-        n_estimators=500,             # High rounds (early stopping will halt naturally)
-        learning_rate=0.1,
-        subsample=0.9,                # Relaxed regularization
-        colsample_bytree=0.9,
-        min_child_weight=1,           # Back to default
-        reg_lambda=1.0,               # Standard L2
-        gamma=0.0,                    # Standard split threshold
+        max_depth=8,                  # Unleash deeper trees
+        n_estimators=1500,            # Massive tree count
+        learning_rate=0.02,           # Very slow, deliberate learning
+        subsample=1.0,                # Use all rows (no stochastic constraint)
+        colsample_bytree=1.0,         # Use all features
+        min_child_weight=1,           # No child weight limit
+        reg_lambda=0.1,               # Very weak L2 regularization
+        gamma=0.0,                    
         random_state=42,
         eval_metric='mlogloss',
-        early_stopping_rounds=30      # Increased patience
+        early_stopping_rounds=100     # Huge patience to find absolute peak
     )
     
     eval_set = [(X_train, y_train), (X_test, y_test)]
