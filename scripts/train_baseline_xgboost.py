@@ -6,9 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, mean_absolute_error
 from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import SMOTE
 import xgboost as xgb
@@ -74,11 +74,13 @@ def main():
     
     X = merged_df[kpi_features].values
     y = merged_df['Rating'].map(RATING_MAP).values
+    groups = merged_df['CIK'].values
     
     # Drop rows with unmapped ratings if any
     valid_idx = ~np.isnan(y)
     X = X[valid_idx]
     y = y[valid_idx].astype(int)
+    groups = groups[valid_idx]
     
     # 2. Imputation
     logging.info("Imputing missing KPI values...")
@@ -91,6 +93,7 @@ def main():
     valid_mask = np.isin(y, valid_classes)
     X = X[valid_mask]
     y = y[valid_mask]
+    groups = groups[valid_mask]
     
     # Re-encode labels to 0...N-1 to satisfy XGBoost requirement
     le = LabelEncoder()
@@ -99,7 +102,13 @@ def main():
     active_class_names = [REVERSE_RATING_MAP[orig] for orig in le.classes_]
     
     # 3. Train-Test Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # 3. Train-Test Split
+    logging.info(f"Dataset contains {len(np.unique(groups))} unique companies across {len(y)} filings.")
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(gss.split(X, y, groups))
+    
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
     
     # Apply SMOTE to training data only
     logging.info("Applying SMOTE to balance training classes...")
@@ -174,9 +183,15 @@ def main():
     macro_f1 = report['macro avg']['f1-score']
     weighted_f1 = report['weighted avg']['f1-score']
     
+    # Calculate Ordinal Metrics
+    mae = mean_absolute_error(y_test, y_pred)
+    within_1_notch = np.mean(np.abs(y_test - y_pred) <= 1)
+    
     logging.info(f"Baseline Accuracy:     {acc:.2%}")
     logging.info(f"Baseline Macro F1:     {macro_f1:.4f}  <-- (Preferred for imbalanced classes)")
     logging.info(f"Baseline Weighted F1:  {weighted_f1:.4f}")
+    logging.info(f"Baseline MAE (Notches):{mae:.4f}")
+    logging.info(f"Baseline Within-1-Notch: {within_1_notch:.2%}")
     
     logging.info(f"Plots saved to {out_dir}/")
     logging.info("Baseline training complete!")
