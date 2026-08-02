@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from sklearn.model_selection import train_test_split, GroupShuffleSplit
+from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import confusion_matrix, classification_report, mean_absolute_error
 from sklearn.preprocessing import LabelEncoder
@@ -51,6 +51,9 @@ def main():
     logging.info("Loading hybrid dataset...")
     df = pd.read_csv(hybrid_csv)
     
+    # Sort chronologically for temporal split
+    df = df.sort_values(by=['Year', 'CIK']).reset_index(drop=True)
+    
     kpi_features = [
         'Debt-to-Equity', 'Retained Earnings / Total Assets', 'Current Ratio', 
         'Quick Ratio', 'Working Capital / Total Assets', 'ROCE', 
@@ -66,13 +69,11 @@ def main():
     
     X = df[all_features].values
     y = df['Rating'].map(RATING_MAP).values
-    groups = df['CIK'].values
     
     # Drop rows with unmapped ratings if any
     valid_idx = ~np.isnan(y)
     X = X[valid_idx]
     y = y[valid_idx].astype(int)
-    groups = groups[valid_idx]
     
     # 2. Imputation
     logging.info("Imputing missing values...")
@@ -85,7 +86,6 @@ def main():
     valid_mask = np.isin(y, valid_classes)
     X = X[valid_mask]
     y = y[valid_mask]
-    groups = groups[valid_mask]
     
     # Re-encode labels to 0...N-1 to satisfy XGBoost requirement
     le = LabelEncoder()
@@ -93,13 +93,11 @@ def main():
     active_classes = list(range(len(le.classes_)))
     active_class_names = [REVERSE_RATING_MAP[orig] for orig in le.classes_]
     
-    # 3. Train-Test Split Grouped by CIK
-    logging.info(f"Dataset contains {len(np.unique(groups))} unique companies across {len(y)} filings.")
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx, test_idx = next(gss.split(X, y, groups))
-    
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
+    # 3. Train-Test Split (Temporal Split)
+    logging.info("Performing chronological train-test split (80/20)...")
+    split_idx = int(len(X) * 0.8)
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
     
     # Apply SMOTE to training data only
     logging.info("Applying SMOTE to balance training classes...")
