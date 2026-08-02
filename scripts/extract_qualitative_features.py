@@ -34,18 +34,14 @@ LLM_API_URL = "http://localhost:8001/v1/chat/completions"
 
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
-def construct_prompt(context: str) -> str:
-    return f"""System: You are an expert corporate credit risk analyst conducting a rigorous financial audit. Based on the provided multi-resolution 10-K context, extract and summarize management's commentary and forward-looking statements. Your extraction must be entirely grounded in the provided text. Do not hallucinate external macroeconomic factors.
+def construct_prompt(dimension: str, context: str) -> str:
+    return f"""System: You are an expert corporate credit risk analyst conducting a rigorous financial audit. I will provide you with a comprehensive summary of a company's SEC 10-K filing. Your task is to perform targeted qualitative extraction for exactly one specific financial dimension: {dimension}.
 
-Respond STRICTLY with a JSON object using these exact keys:
-1. "Revenue": What is driving sales growth or contraction?
-2. "Operating Profit": What factors are impacting operational efficiency?
-3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins?
-4. "Net Profit": What is management's narrative around bottom-line earnings?
-5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity?
+Carefully analyze the text and extract any management commentary, forward-looking guidance, or identified risk factors that directly impact this specific dimension. Your extraction must be entirely grounded in the provided text. Do not summarize other metrics or hallucinate external macroeconomic factors. 
 
-Context:
-{context}
+If the provided summary contains no relevant information regarding {dimension}, you must output exactly the word "None".
+
+User: {context}
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -101,33 +97,31 @@ def process_company(row, out_dir, trees_dir, model_id, topic_embeddings, embedde
                 
         retrieved_texts = [tree.all_nodes[n_id].text for n_id in selected_nodes]
         context_str = "\n\n---\n\n".join(retrieved_texts)
-        prompt = construct_prompt(context_str)
         
-        payload = {
-            "model": model_id,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "temperature": base_temperature + (attempt * 0.2),
-            "max_tokens": 2048
-        }
+        parsed_json = {}
+        dimensions = ["Revenue", "Operating Profit", "Net/Gross Margins", "Net Profit", "Free Cash Flow"]
         
         try:
-            resp = requests.post(api_url, json=payload, timeout=600)
-            resp.raise_for_status()
-            llm_output = resp.json()["choices"][0]["message"]["content"]
-            
-            parsed_json = json.loads(llm_output)
+            for dim in dimensions:
+                prompt = construct_prompt(dim, context_str)
+                payload = {
+                    "model": model_id,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": base_temperature + (attempt * 0.2),
+                    "max_tokens": 2048
+                }
+                resp = requests.post(api_url, json=payload, timeout=600)
+                resp.raise_for_status()
+                parsed_json[dim] = resp.json()["choices"][0]["message"]["content"].strip()
             
             with open(out_file, 'w', encoding='utf-8') as f:
                 json.dump(parsed_json, f, indent=4, ensure_ascii=False)
             
             return f"Successfully processed {cik}_{year}"
-        except json.JSONDecodeError as e:
+        except Exception as e:
             if attempt == 2:
                 return f"LLM API failed for {cik}_{year} after 3 retries: {e}"
-            logging.warning(f"JSON decode failed for {cik}_{year}, retrying... (attempt {attempt + 1})")
-        except Exception as e:
-            return f"LLM API failed for {cik}_{year}: {e}"
+            logging.warning(f"LLM extraction failed for {cik}_{year}, retrying... (attempt {attempt + 1})")
 
 def main():
     out_dir = project_root / 'data' / 'qualitative_features'
