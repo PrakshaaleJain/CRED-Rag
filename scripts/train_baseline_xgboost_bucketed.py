@@ -70,7 +70,15 @@ def main():
         'Net Profit Margin', 'Total Liabilities / Total Assets'
     ]
     
-    X = merged_df[kpi_features].values
+    kpi_delta_features = []
+    for kpi in kpi_features:
+        delta_col = f'{kpi}_YoY_Change'
+        merged_df[delta_col] = merged_df.groupby('CIK')[kpi].diff().fillna(0)
+        kpi_delta_features.append(delta_col)
+        
+    all_features = kpi_features + kpi_delta_features
+    
+    X = merged_df[all_features].values
     y = merged_df['Rating'].map(RATING_MAP).values
     
     # Drop rows with unmapped ratings if any
@@ -135,6 +143,33 @@ def main():
     
     acc = report['accuracy']
     macro_f1 = report['macro avg']['f1-score']
+    
+    importance = model.feature_importances_
+    sorted_idx = np.argsort(importance)
+    
+    # Color code features: Quant (skyblue) vs YoY Delta (plum)
+    colors = []
+    for i in sorted_idx:
+        feat = all_features[i]
+        if feat in kpi_delta_features:
+            colors.append('plum')
+        else:
+            colors.append('skyblue')
+            
+    plt.barh(range(len(sorted_idx)), importance[sorted_idx], align='center', color=colors)
+    plt.yticks(range(len(sorted_idx)), [all_features[i] for i in sorted_idx])
+    plt.title('Baseline Bucketed Feature Importance', fontsize=14)
+    plt.xlabel('XGBoost Relative Importance', fontsize=12)
+    
+    import matplotlib.patches as mpatches
+    quant_patch = mpatches.Patch(color='skyblue', label='Quantitative KPIs')
+    delta_patch = mpatches.Patch(color='plum', label='YoY Deltas')
+    plt.legend(handles=[quant_patch, delta_patch], loc='lower right')
+    
+    plt.tight_layout()
+    plt.savefig(out_dir / 'baseline_bucketed_feature_importance.png', dpi=300)
+    plt.close()
+    
     weighted_f1 = report['weighted avg']['f1-score']
     
     mae = mean_absolute_error(y_test, y_pred)
