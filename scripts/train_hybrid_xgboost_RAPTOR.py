@@ -42,8 +42,8 @@ def main():
     # 1. Load Data
     logging.info("Loading hybrid dataset...")
     df = pd.read_csv(hybrid_csv)
-    # Sort by CIK and Year for temporal split and YoY delta calculation
-    df = df.sort_values(by=['CIK', 'Year']).reset_index(drop=True)
+    # Sort by Year and CIK for chronological temporal split
+    df = df.sort_values(by=['Year', 'CIK']).reset_index(drop=True)
     
     kpi_features = [
         'Debt-to-Equity', 'Retained Earnings / Total Assets', 'Current Ratio', 
