@@ -77,7 +77,7 @@ def run_knn_validation():
     
     class_counts = pd.Series(y).value_counts()
     valid_classes = class_counts[class_counts >= 2].index
-    mask = pd.Series(y).isin(valid_classes)
+    mask = pd.Series(y).isin(valid_classes).values
     
     X = X[mask]
     y = y[mask]
