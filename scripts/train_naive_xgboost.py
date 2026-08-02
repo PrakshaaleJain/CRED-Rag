@@ -51,13 +51,20 @@ def main():
         'Quick Ratio', 'Working Capital / Total Assets', 'ROCE', 
         'Net Profit Margin', 'Total Liabilities / Total Assets'
     ]
+    
+    kpi_delta_features = []
+    for kpi in kpi_features:
+        delta_col = f'{kpi}_YoY_Change'
+        df[delta_col] = df.groupby('CIK')[kpi].diff().fillna(0)
+        kpi_delta_features.append(delta_col)
+        
     sent_features = [
         'Revenue_Sentiment', 'Operating Profit_Sentiment', 
         'Net/Gross Margins_Sentiment', 'Net Profit_Sentiment', 
         'Free Cash Flow_Sentiment'
     ]
     
-    all_features = kpi_features + sent_features
+    all_features = kpi_features + kpi_delta_features + sent_features
     
     X = df[all_features].values
     y = df['Rating'].map(RATING_MAP).values
@@ -101,17 +108,17 @@ def main():
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=len(active_classes),
-        max_depth=5,                  # Allow deeper trees to capture Quant + Qual interactions
-        n_estimators=500,             # High rounds (early stopping will halt naturally)
+        max_depth=4,                  # Harmonized with Baseline
+        n_estimators=150,             # Harmonized with Baseline
         learning_rate=0.1,
-        subsample=0.9,                # Relaxed regularization
+        subsample=0.9,
         colsample_bytree=0.9,
-        min_child_weight=1,           # Back to default
-        reg_lambda=1.0,               # Standard L2
-        gamma=0.0,                    # Standard split threshold
+        min_child_weight=1,
+        reg_lambda=5.0,               # Increased L2 regularization to prevent overfitting on sentiment
+        gamma=0.0,
         random_state=42,
         eval_metric='mlogloss',
-        early_stopping_rounds=30      # Increased patience
+        early_stopping_rounds=30
     )
     
     eval_set = [(X_train, y_train), (X_test, y_test)]
@@ -145,8 +152,16 @@ def main():
     sorted_idx = np.argsort(importance)
     plt.figure(figsize=(10, 8))
     
-    # Color code features: Quant (skyblue) vs Qual (lightgreen)
-    colors = ['lightgreen' if all_features[i] in sent_features else 'skyblue' for i in sorted_idx]
+    # Color code features: Quant (skyblue) vs YoY Delta (plum) vs Qual (lightgreen)
+    colors = []
+    for i in sorted_idx:
+        feat = all_features[i]
+        if feat in sent_features:
+            colors.append('lightgreen')
+        elif feat in kpi_delta_features:
+            colors.append('plum')
+        else:
+            colors.append('skyblue')
     
     plt.barh(range(len(sorted_idx)), importance[sorted_idx], align='center', color=colors)
     plt.yticks(range(len(sorted_idx)), [all_features[i] for i in sorted_idx])
@@ -156,8 +171,9 @@ def main():
     # Create custom legend for colors
     import matplotlib.patches as mpatches
     quant_patch = mpatches.Patch(color='skyblue', label='Quantitative KPIs')
+    delta_patch = mpatches.Patch(color='plum', label='YoY Deltas')
     qual_patch = mpatches.Patch(color='lightgreen', label='Naive RAG Sentiment')
-    plt.legend(handles=[quant_patch, qual_patch], loc='lower right')
+    plt.legend(handles=[quant_patch, delta_patch, qual_patch], loc='lower right')
     
     plt.tight_layout()
     plt.savefig(out_dir / 'naive_feature_importance.png', dpi=300)
