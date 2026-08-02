@@ -35,15 +35,14 @@ LLM_API_URL = "http://localhost:8001/v1/chat/completions"
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 def construct_prompt(context: str) -> str:
-    return f"""Based on the provided multi-resolution 10-K context, extract and summarize management's commentary and forward-looking statements regarding the following topics.
-For speed and brevity, you MUST limit your response to EXACTLY ONE SHORT SENTENCE per topic. Be extremely concise.
+    return f"""System: You are an expert corporate credit risk analyst conducting a rigorous financial audit. Based on the provided multi-resolution 10-K context, extract and summarize management's commentary and forward-looking statements. Your extraction must be entirely grounded in the provided text. Do not hallucinate external macroeconomic factors.
 
 Respond STRICTLY with a JSON object using these exact keys:
-1. "Revenue": What is driving sales growth or contraction? (TWO sentence)
-2. "Operating Profit": What factors are impacting operational efficiency? (TWO sentence)
-3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins? (TWO sentence)
-4. "Net Profit": What is management's narrative around bottom-line earnings? (TWO sentence)
-5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity? (TWO sentence)
+1. "Revenue": What is driving sales growth or contraction?
+2. "Operating Profit": What factors are impacting operational efficiency?
+3. "Net/Gross Margins": How is pricing power, inflation, or COGS affecting margins?
+4. "Net Profit": What is management's narrative around bottom-line earnings?
+5. "Free Cash Flow": What is the commentary regarding cash generation and liquidity?
 
 Context:
 {context}
