@@ -11,7 +11,7 @@
 CredRAG is an end-to-end AI pipeline that automates corporate credit score prediction by combining qualitative sentiment extracted from unstructured SEC 10-K filings with traditional quantitative financial metrics. It addresses the "black-box" nature of Large Language Models (LLMs) in finance by employing a hierarchical Retrieval-Augmented Generation (RAG) architecture that maintains a deterministic, backward-chaining audit trail from the final credit prediction all the way back to the raw source text.
 
 <p align="center">
-  <img src="assets/conceptual_overview.png" alt="Conceptual Overview of CredRAG" width="800">
+  <img src="media/intro_digram.png" alt="Conceptual Overview of CredRAG" width="800">
 </p>
 
 ---
@@ -45,7 +45,7 @@ Our empirical evaluation on a dataset of 2,349 SEC filings demonstrates that Cre
 ## Pipeline Architecture
 
 <p align="center">
-  <img src="assets/architecture.png" alt="Proposed Credit Scoring Architecture" width="1000">
+  <img src="media/architecture.png" alt="Proposed Credit Scoring Architecture" width="1000">
 </p>
 
 ```mermaid
@@ -91,7 +91,7 @@ Standard flat-chunking RAG pipelines fail to capture filing-wide thematic risks.
 - Extracted summaries are scored for financial sentiment using `ProsusAI/finbert`.
 
 <p align="center">
-  <img src="assets/hierarchical_retrieval.png" alt="Hierarchical Retrieval Mechanism" width="800">
+  <img src="media/RATPOR.png" alt="Hierarchical Retrieval Mechanism" width="800">
 </p>
 
 ### 3. Credit Rating Prediction
@@ -110,7 +110,7 @@ A critical requirement for deployment in financial institutions is explainabilit
 3. The RAPTOR retrieval logs map that summary directly back to the specific contiguous text chunks in the original SEC 10-K filing.
 
 <p align="center">
-  <img src="assets/audit_trace.png" alt="Deterministic Backward-Chaining Audit Trace" width="1000">
+  <img src="media/audit_trace.png" alt="Deterministic Backward-Chaining Audit Trace" width="1000">
 </p>
 
 This backward-chaining completely eliminates the LLM "black-box" effect and ensures full compliance with institutional audit requirements.
