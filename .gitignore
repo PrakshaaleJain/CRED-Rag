@@ -8,4 +8,5 @@ data/
 *.gguf
 models/
 scratch/
-OmegaSquared/output/
+OmegaSquared/
+output/

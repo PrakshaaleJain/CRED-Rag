@@ -10,6 +10,10 @@
 
 CredRAG is an end-to-end AI pipeline that automates corporate credit score prediction by combining qualitative sentiment extracted from unstructured SEC 10-K filings with traditional quantitative financial metrics. It addresses the "black-box" nature of Large Language Models (LLMs) in finance by employing a hierarchical Retrieval-Augmented Generation (RAG) architecture that maintains a deterministic, backward-chaining audit trail from the final credit prediction all the way back to the raw source text.
 
+<p align="center">
+  <img src="assets/conceptual_overview.png" alt="Conceptual Overview of CredRAG" width="800">
+</p>
+
 ---
 
 ## Performance Highlights
@@ -21,34 +25,55 @@ Our empirical evaluation on a dataset of 2,349 SEC filings demonstrates that Cre
 - **Within-1-Notch Accuracy**: **88.38%** of predictions were either exactly correct or within a single rating notch.
 - **Mean Absolute Error (MAE)**: Reduced to **0.518** notches.
 
+### Model Performance Comparison (22-Notch Scale)
+
+| Model Strategy | Macro Accuracy | MAE | Within-1-Bucket | Weighted F1 |
+|:---|:---:|:---:|:---:|:---:|
+| **Baseline (Quant Only)** | 58.51% | 0.618 | 83.82% | 0.5966 |
+| **Naive RAG (Quant+Flat Text)** | 54.17% | 0.667 | 79.17% | 0.5378 |
+| **Hierarchical RAG (Quant+Tree Text)** | **63.07%** | **0.518** | **88.38%** | **0.6371** |
+
+### Retrieval Evaluation (Conceptual Abstraction)
+
+| Pipeline | Precision | Recall | Relevance |
+|:---|:---:|:---:|:---:|
+| **Naive RAG** | 80.0% | 64.0% | 50.0% |
+| **Hierarchical RAG** | **88.0%** | **74.0%** | **56.0%** |
+
 ---
 
 ## Pipeline Architecture
 
-```text
-SEC 10-K Filing Input
-          │
-          ▼
-      Cold Start?
-      ├── Yes → KNN Peer Proxy (Average sentiment of 5 quantitative peers)
-      └── No  → RAPTOR Extraction (Process native 10-K filing)
-                                   │
-                                   ▼
-             Hierarchical Semantic Tree Construction (Llama-3.1-8B)
-                                   │
-                                   ▼
-            Targeted Qualitative Extraction (5 Financial Dimensions)
-                                   │
-                                   ▼
-                Sentiment Scoring (ProsusAI/FinBERT)
-                                   │
-                        ┌──────────┴──────────┐
-                 Qualitative Signals      Quantitative KPIs (8 Ratios)
-                                   │
-                              XGBoost Model
-                                   │
-                          Credit Rating Prediction 
-                   (22-Notch Scale / 6-Bucket Macro Scale)
+<p align="center">
+  <img src="assets/architecture.png" alt="Proposed Credit Scoring Architecture" width="1000">
+</p>
+
+```mermaid
+graph TD
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333,font-family:sans-serif;
+    classDef blue fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
+    classDef green fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
+    classDef yellow fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px;
+    classDef purple fill:#ebdef0,stroke:#8e44ad,stroke-width:2px;
+    classDef root fill:#f2d7d5,stroke:#c0392b,stroke-width:2px,color:#333,font-weight:bold;
+
+    A[SEC 10-K Filing Input]:::root --> B{Cold Start?}
+    B -- Yes --> C[KNN Peer Proxy<br/>Average sentiment of 5 quant peers]:::yellow
+    B -- No --> D[RAPTOR Extraction<br/>Process native 10-K filing]:::blue
+    
+    D --> E[Hierarchical Semantic Tree Construction<br/>Llama-3.1-8B]:::blue
+    E --> F[Targeted Qualitative Extraction<br/>5 Financial Dimensions]:::blue
+    F --> G[Sentiment Scoring<br/>ProsusAI/FinBERT]:::blue
+    
+    C --> H((Qualitative Signals)):::green
+    G --> H
+    
+    A --> I[Quantitative KPI Extraction<br/>8 Financial Ratios]:::purple
+    I --> J((Quantitative KPIs)):::green
+    
+    H --> K[XGBoost Classifier]:::root
+    J --> K
+    K --> L[Credit Rating Prediction<br/>22-Notch / 6-Bucket]:::root
 ```
 
 ---
@@ -65,6 +90,10 @@ Standard flat-chunking RAG pipelines fail to capture filing-wide thematic risks.
 - The model extracts narratives across five targeted dimensions: **Revenue, Operating Profit, Net/Gross Margins, Net Profit, and Free Cash Flow**.
 - Extracted summaries are scored for financial sentiment using `ProsusAI/finbert`.
 
+<p align="center">
+  <img src="assets/hierarchical_retrieval.png" alt="Hierarchical Retrieval Mechanism" width="800">
+</p>
+
 ### 3. Credit Rating Prediction
 The extracted qualitative sentiment vectors and quantitative KPIs are fused and fed into an **XGBoost** classifier, optimized for multi-class ordinal classification across a standard 22-notch rating scale (AAA to D).
 
@@ -79,6 +108,10 @@ A critical requirement for deployment in financial institutions is explainabilit
 1. Risk analysts can view the XGBoost feature importance (e.g., observing a downgrade driven by `Revenue_Sentiment`).
 2. They can query the pipeline logs to retrieve the exact intermediate qualitative summary generated by Llama-3.1.
 3. The RAPTOR retrieval logs map that summary directly back to the specific contiguous text chunks in the original SEC 10-K filing.
+
+<p align="center">
+  <img src="assets/audit_trace.png" alt="Deterministic Backward-Chaining Audit Trace" width="1000">
+</p>
 
 This backward-chaining completely eliminates the LLM "black-box" effect and ensures full compliance with institutional audit requirements.
 
