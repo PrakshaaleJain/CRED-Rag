@@ -1,4 +1,4 @@
-# CRED-RAPTOR
+# CredRAG
 
 **A Hierarchical RAG-based LLM Pipeline for Corporate Credit Risk Assessment**
 
@@ -9,112 +9,85 @@
 
 ## Overview
 
-CRED-RAPTOR is an end-to-end AI pipeline that predicts corporate credit scores by combining qualitative insights extracted from unstructured financial documents with traditional quantitative financial metrics. It addresses key limitations in conventional credit risk assessment — lack of transparency, manual effort, and underutilization of unstructured data.
+CredRAG is an end-to-end AI pipeline that automates corporate credit score prediction by combining qualitative sentiment extracted from unstructured SEC 10-K filings with traditional quantitative financial metrics. It addresses the "black-box" nature of Large Language Models (LLMs) in finance by employing a hierarchical Retrieval-Augmented Generation (RAG) architecture that maintains a deterministic, backward-chaining audit trail from the final credit prediction all the way back to the raw source text.
 
 ---
 
-## Motivation
+## Performance Highlights
 
-Traditional credit risk frameworks rely heavily on manual analysis of financial ratios and structured data, often ignoring the rich qualitative signals present in lengthy documents like credit memos and SEC filings. Research shows that qualitative factors such as management experience, operational risks, and regulatory compliance significantly improve credit outcomes. CRED-RAPTOR bridges this gap.
+Our empirical evaluation on a dataset of 2,349 SEC filings demonstrates that CredRAG significantly outperforms traditional quantitative baselines and standard flat-chunking RAG approaches:
+
+- **22-Notch Granular Scale**: Peak accuracy of **63.07%** (up from 58.51% quant baseline).
+- **6-Bucket Macro Scale**: Peak accuracy of **81.20%**.
+- **Within-1-Notch Accuracy**: **88.38%** of predictions were either exactly correct or within a single rating notch.
+- **Mean Absolute Error (MAE)**: Reduced to **0.518** notches.
 
 ---
 
 ## Pipeline Architecture
 
+```text
+SEC 10-K Filing Input
+          │
+          ▼
+      Cold Start?
+      ├── Yes → KNN Peer Proxy (Average sentiment of 5 quantitative peers)
+      └── No  → RAPTOR Extraction (Process native 10-K filing)
+                                   │
+                                   ▼
+             Hierarchical Semantic Tree Construction (Llama-3.1-8B)
+                                   │
+                                   ▼
+            Targeted Qualitative Extraction (5 Financial Dimensions)
+                                   │
+                                   ▼
+                Sentiment Scoring (ProsusAI/FinBERT)
+                                   │
+                        ┌──────────┴──────────┐
+                 Qualitative Signals      Quantitative KPIs (8 Ratios)
+                                   │
+                              XGBoost Model
+                                   │
+                          Credit Rating Prediction 
+                   (22-Notch Scale / 6-Bucket Macro Scale)
 ```
-Company Input
-     │
-     ▼
- Cold Start?
- ├── Yes → KNN Peer Finding → RAPTOR Extraction (from peers) → Source Indicator = 0
- └── No  → RAPTOR Extraction (own 10-K filings)              → Source Indicator = 1
-                                │
-                     ┌──────────┴──────────┐
-              Qualitative Features   Quantitative Features (KPIs)
-                                │
-                           XGBoost Model
-                                │
-                           Credit Score (0–10)
-```
 
 ---
 
-## Features
+## Core Components
 
-### Quantitative Features (from SEC 10-K filings)
-| KPI | Formula |
-|-----|---------|
-| Profit Margin | Net Income / Net Sales × 100 |
-| Return on Assets | Net Income / Total Assets × 100 |
-| Debt Ratio | Long-term Debt / Total Assets × 100 |
+### 1. Quantitative KPI Extraction
+To establish a robust mathematical baseline, 8 programmatic financial KPIs (including Current Ratio, Debt-to-Equity, ROCE) are deterministically extracted from the XBRL tabular data of SEC filings using a heuristic-based parsing algorithm.
 
-### Qualitative Features (via RAPTOR + LLM)
-Scored on a 10-point scale across five dimensions:
-- Industry & Business Risk
-- Revenue Stability Risk
-- Operational & Asset Risk
-- Management & Execution Risk
-- Regulatory & Licensing Risk
+### 2. Qualitative Extraction via RAPTOR
+Standard flat-chunking RAG pipelines fail to capture filing-wide thematic risks. CredRAG utilizes a modified [RAPTOR](https://arxiv.org/abs/2401.18059) (Recursive Abstractive Processing for Tree-Organized Retrieval) pipeline:
+- Filings are segmented into 512-token chunks and embedded using `yixuantt/Fin-E5`.
+- Chunks are clustered using Gaussian Mixture Models (GMM) and recursively summarized by a locally hosted `meta-llama/Llama-3.1-8B-Instruct` model to build a bottom-up semantic tree.
+- The model extracts narratives across five targeted dimensions: **Revenue, Operating Profit, Net/Gross Margins, Net Profit, and Free Cash Flow**.
+- Extracted summaries are scored for financial sentiment using `ProsusAI/finbert`.
 
-### Source Indicator
-A binary feature that distinguishes companies with existing SEC filings (`1`) from cold-start companies (`0`).
+### 3. Credit Rating Prediction
+The extracted qualitative sentiment vectors and quantitative KPIs are fused and fed into an **XGBoost** classifier, optimized for multi-class ordinal classification across a standard 22-notch rating scale (AAA to D).
+
+### 4. Cold-Start Peer Proxying
+For companies lacking sufficient institutional filing history (cold-start), CredRAG employs a K-Nearest Neighbors (KNN) algorithm. The system maps the company to its 5 closest peers (via Euclidean distance on industry quantitative features) and averages their pre-computed qualitative sentiment vectors. Our ablation studies prove that while this establishes a baseline, native qualitative disclosures are highly idiosyncratic and cannot be perfectly proxied.
 
 ---
 
-## Methodology
+## Auditability & Traceability
 
-### Qualitative Feature Extraction — RAPTOR
-[RAPTOR](https://arxiv.org/abs/2401.18059) (Recursive Abstractive Processing for Tree-organized Retrieval) is used to process long 10-K documents:
+A critical requirement for deployment in financial institutions is explainability. CredRAG is designed with a strict deterministic traceback mechanism:
+1. Risk analysts can view the XGBoost feature importance (e.g., observing a downgrade driven by `Revenue_Sentiment`).
+2. They can query the pipeline logs to retrieve the exact intermediate qualitative summary generated by Llama-3.1.
+3. The RAPTOR retrieval logs map that summary directly back to the specific contiguous text chunks in the original SEC 10-K filing.
 
-1. Documents are segmented into contiguous chunks
-2. Chunks are embedded using **SBERT**
-3. Soft clustering via **Gaussian Mixture Models** (chunks can belong to multiple clusters)
-4. Each cluster is summarized by an LLM into a parent node
-5. Parent nodes are re-embedded and re-clustered recursively, building a bottom-up tree
-6. Nodes are retrieved using **cosine similarity** until a token threshold is met
-7. Retrieved context is passed to an LLM prompt to score the five credit risk dimensions
-
-### Credit Score Prediction — XGBoost
-All three feature types (quantitative KPIs, qualitative scores, source indicator) are fed into an **XGBoost** model to predict a final credit score ranging from **0 to 10**.
-
-### Cold-Start Handling — KNN Peer Clustering
-For companies with no prior institutional history, **K-Nearest Neighbours** clustering identifies similar peer companies. The qualitative features of these peers are then used as a proxy for the cold-start company's profile.
-
----
-
-## Data
-
-- **Source**: US SEC 10-K filings
-- **Scope**: Corporate financial documents with structured and unstructured content
-- Ground-truth credit scores are not publicly available in SEC filings (see Future Work)
-
----
-
-## Explainability & Auditability
-
-CRED-RAPTOR is designed with transparency in mind:
-- Features are explicitly extracted and visible — no hidden scoring logic
-- RAG grounding ensures extracted qualitative features are traceable to source documents
-- The XGBoost model operates on interpretable features, satisfying regulatory requirements for explainable credit decisions
-
----
-
-## Future Work
-
-- **Fine-tuned LLMs** with domain expertise for improved qualitative assessment
-- **Synthetic credit score labels** generated by LLMs for training when ground truth is unavailable
-- **Data augmentation** for cold-start companies with sparse financial data
-- **Pipeline caching** to improve auditability and traceability of credit decisions
+This backward-chaining completely eliminates the LLM "black-box" effect and ensures full compliance with institutional audit requirements.
 
 ---
 
 ## References
-
-1. Soares et al., "Quantitative vs. qualitative criteria for credit risk assessment," *Frontiers in Finance and Economics*, 2011.
-2. Dil & Ramchand, "AI and machine learning in credit risk assessment," *SSRN Working Paper*, 2025.
-3. Rao et al., "RiskRAG: A data-driven solution for improved AI model risk reporting," *CHI 2025*.
-4. Sarthi et al., "RAPTOR: Recursive abstractive processing for tree-organized retrieval," *ICLR 2024*.
-5. Mittapelly, "Enhancing credit risk analysis in financial CRMs using RAG and predictive AI," *J Artif Intell Mach Learn & Data Sci*, 2024.
+1. Sarthi et al., "RAPTOR: Recursive abstractive processing for tree-organized retrieval," *ICLR 2024*.
+2. *(Add your paper citation here upon publication)*
 
 ---
 
@@ -126,7 +99,5 @@ CRED-RAPTOR is designed with transparency in mind:
 | Prakshaale Jain | IIT (BHU) Varanasi |
 | Harsh Kasyap | IIT (BHU) Varanasi · University of Warwick |
 | Carsten Maple | University of Warwick · The Alan Turing Institute |
-
----
 
 *Equal contribution by Shreya Gupta and Prakshaale Jain.*

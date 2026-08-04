@@ -7,3 +7,5 @@ sec_filings/
 data/
 *.gguf
 models/
+scratch/
+OmegaSquared/
