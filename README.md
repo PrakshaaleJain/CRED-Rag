@@ -88,9 +88,3 @@ A critical requirement for deployment in financial institutions is explainabilit
 </p>
 
 This backward-chaining completely eliminates the LLM "black-box" effect and ensures full compliance with institutional audit requirements.
-
----
-
-## References
-1. Sarthi et al., "RAPTOR: Recursive abstractive processing for tree-organized retrieval," *ICLR 2024*.
-2. *(Add your paper citation here upon publication)*
