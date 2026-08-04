@@ -48,33 +48,7 @@ Our empirical evaluation on a dataset of 2,349 SEC filings demonstrates that Cre
   <img src="media/intro_digram.png" alt="Conceptual Overview of CredRAG" width="1000">
 </p>
 
-```mermaid
-graph TD
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333,font-family:sans-serif;
-    classDef blue fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
-    classDef green fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
-    classDef yellow fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px;
-    classDef purple fill:#ebdef0,stroke:#8e44ad,stroke-width:2px;
-    classDef root fill:#f2d7d5,stroke:#c0392b,stroke-width:2px,color:#333,font-weight:bold;
 
-    A[SEC 10-K Filing Input]:::root --> B{Cold Start?}
-    B -- Yes --> C[KNN Peer Proxy<br/>Average sentiment of 5 quant peers]:::yellow
-    B -- No --> D[RAPTOR Extraction<br/>Process native 10-K filing]:::blue
-    
-    D --> E[Hierarchical Semantic Tree Construction<br/>Llama-3.1-8B]:::blue
-    E --> F[Targeted Qualitative Extraction<br/>5 Financial Dimensions]:::blue
-    F --> G[Sentiment Scoring<br/>ProsusAI/FinBERT]:::blue
-    
-    C --> H((Qualitative Signals)):::green
-    G --> H
-    
-    A --> I[Quantitative KPI Extraction<br/>8 Financial Ratios]:::purple
-    I --> J((Quantitative KPIs)):::green
-    
-    H --> K[XGBoost Classifier]:::root
-    J --> K
-    K --> L[Credit Rating Prediction<br/>22-Notch / 6-Bucket]:::root
-```
 
 ---
 
