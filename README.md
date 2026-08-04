@@ -2,8 +2,7 @@
 
 **A Hierarchical RAG-based LLM Pipeline for Corporate Credit Risk Assessment**
 
-> *Shreya Gupta, Prakshaale Jain, Harsh Kasyap, Carsten Maple*
-> IIT (BHU) Varanasi, India · University of Warwick, UK · The Alan Turing Institute, UK
+> *Anonymized for Double-Blind Peer Review*
 
 ---
 
@@ -88,16 +87,3 @@ This backward-chaining completely eliminates the LLM "black-box" effect and ensu
 ## References
 1. Sarthi et al., "RAPTOR: Recursive abstractive processing for tree-organized retrieval," *ICLR 2024*.
 2. *(Add your paper citation here upon publication)*
-
----
-
-## Authors
-
-| Name | Affiliation |
-|------|-------------|
-| Shreya Gupta | IIT (BHU) Varanasi |
-| Prakshaale Jain | IIT (BHU) Varanasi |
-| Harsh Kasyap | IIT (BHU) Varanasi · University of Warwick |
-| Carsten Maple | University of Warwick · The Alan Turing Institute |
-
-*Equal contribution by Shreya Gupta and Prakshaale Jain.*
